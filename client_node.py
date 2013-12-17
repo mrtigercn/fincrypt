@@ -52,8 +52,8 @@ class CommandLineProtocol(basic.LineReceiver):
 			except IndexError:
 				self._display_message('Missing filename')
 				return
+			self.getFile(filename)
 			
-			self.connection.transport.write('%s %s\n' % (command, filename))
 		elif command == 'put':
 			try:
 				file_path = data[1]
@@ -68,7 +68,10 @@ class CommandLineProtocol(basic.LineReceiver):
 			self.connection.transport.write('%s %s\n' % (command, data[1]))
 		
 		self.factory.deferred.addCallback(self._display_response)
-			
+	
+	def getFile(self, filename):
+			self.connection.transport.write('%s %s\n' % ('get', filename))
+	
 	def sendFile(self, file_path, filename):
 		if not os.path.isfile(file_path):
 			self._display_message('This file does not exist')
@@ -210,16 +213,21 @@ def parse_new_dir(directory, pwd, key):
 			else:
 				encrypt_file(key, root + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + file).hexdigest())
 
+class Client():
+	def __init__(self, cfg):
+		self.config = ConfigParser.ConfigParser()
+		self.config.readfp(open(cfg))
+		self.configport = int(self.config.get('client', 'port'))
+		self.configpath = self.config.get('client', 'path')
+		self.configip = self.config.get('client', 'ip')
+		self.password = self.config.get('client', 'password')
+		self.enc_key = hashlib.sha256(self.password).digest()
+	
+	def connect(self):
+		print 'Client started, incoming files will be saved to %s' % (c.configpath)
+		stdio.StandardIO(CommandLineProtocol(self.configip, self.configport, self.configpath))
+		reactor.run()
+
 if __name__ == '__main__':
-	config = ConfigParser.ConfigParser()
-	config.readfp(open('client.cfg'))
-	configport = int(config.get('client', 'port'))
-	configpath = config.get('client', 'path')
-	configip = config.get('client', 'ip')
-	password = config.get('client', 'password')
-	enc_key = hashlib.sha256(password).digest()
-	
-	print 'Client started, incoming files will be saved to %s' % (configpath)
-	
-	stdio.StandardIO(CommandLineProtocol(configip, configport, configpath))
-	reactor.run()
+	c = Client('client.cfg')
+	c.connect()
