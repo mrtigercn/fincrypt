@@ -10,131 +10,64 @@ from dirtools import Dir, DirState
 import hashlib
 from file_encrypt import encrypt_file, decrypt_file
 
-class CommandLineProtocol(basic.LineReceiver):
-	delimiter = '\n'
-	
-	def __init__(self, server_ip, server_port, files_path):
-		self.server_ip = server_ip
-		self.server_port = server_port
-		self.files_path = files_path
-	
-	def connectionMade(self):  
-		self.factory = FileTransferClientFactory(self.files_path)
-		self.connection = reactor.connectTCP(self.server_ip, self.server_port, self.factory)
-		self.factory.deferred.addCallback(self._display_response)
-		
-	def lineReceived(self, line):
-		""" If a line is received, call sendCommand(), else prompt user for input. """
-		
-		if not line:
-			self._prompt()
-			return
-		
-		self._sendCommand(line)
-		
-	def _sendCommand(self, line):
-		""" Sends a command to the server. """
-		
-		data = clean_and_split_input(line) 
-		if len(data) == 0 or data == '':
-			return 
-
-		command = data[0].lower()
-		if not command in COMMANDS:
-			self._display_message('Invalid command')
-			return
-		
-		if command == 'list' or command == 'help' or command == 'quit':
-			self.connection.transport.write('%s\n' % (command))
-		elif command == 'get':
-			try:
-				filename = data[1]
-			except IndexError:
-				self._display_message('Missing filename')
-				return
-			self.getFile(filename)
-			
-		elif command == 'put':
-			try:
-				file_path = data[1]
-				filename = data[2]
-			except IndexError:
-				self._display_message('Missing local file path or remote file name')
-				return
-			
-			self.sendFile(file_path, filename)
-		
-		else:
-			self.connection.transport.write('%s %s\n' % (command, data[1]))
-		
-		self.factory.deferred.addCallback(self._display_response)
-	
-	def getFile(self, filename):
-			self.connection.transport.write('%s %s\n' % ('get', filename))
-	
-	def sendFile(self, file_path, filename):
-		if not os.path.isfile(file_path):
-			self._display_message('This file does not exist')
-			return
-
-		file_size = os.path.getsize(file_path) / 1024
-	
-		print 'Uploading file: %s (%d KB)' % (filename, file_size)
-	
-		self.connection.transport.write('PUT %s %s\n' % (filename, get_file_md5_hash(file_path)))
-		self.setRawMode()
-	
-		for bytes in read_bytes_from_file(file_path):
-			self.connection.transport.write(bytes)
-	
-		self.connection.transport.write('\r\n')   
-	
-		# When the transfer is finished, we go back to the line mode 
-		self.setLineMode()
-	
-
-		
-	def _display_response(self, lines = None):
-		""" Displays a server response. """
-		if lines:
-			for line in lines:
-				print '%s' % (line)
-			
-		self._prompt()
-		self.factory.deferred = defer.Deferred()
-		
-	def _prompt(self):
-		""" Prompts user for input. """
-		self.transport.write('> ')
-		
-	def _display_message(self, message):
-		""" Helper function which prints a message and prompts user for input. """
-		
-		print message
-		self._prompt()	
-
 class FileTransferProtocol(basic.LineReceiver):
 	delimiter = '\n'
-
+	
+	def maybeDisconnect(self):
+		global file_count
+		file_count -= 1
+		if 0 == file_count:
+			self.transport.loseConnection()
+	
+	def _get_file(self, filename):
+		self.transport.write('%s %s\n' % ('get', filename))
+		self.maybeDisconnect()
+	
+	def _send_file(self, file_path, filename):
+		file_path = file_path + '/' + filename
+		if not os.path.isfile(file_path):
+			print "The file '%s' does not exist" % file_path
+			return
+		
+		file_size = os.path.getsize(file_path) / 1024
+		
+		print 'Uploading file: %s (%d KB)' % (filename, file_size)
+		
+		self.transport.write('PUT %s %s\n' % (filename, get_file_md5_hash(file_path)))
+		#self.setRawMode()
+		for bytes in read_bytes_from_file(file_path):
+			self.transport.write(bytes)
+		
+		self.transport.write('\r\n')   
+		
+		# When the transfer is finished, we go back to the line mode 
+		self.setLineMode()
+		self.maybeDisconnect()
+	
 	def connectionMade(self):
 		self.buffer = []
 		self.file_handler = None
 		self.file_data = ()
-		
 		print 'Connected to the server'
+		
+		if self.factory.cmd == 'get':
+			self._get_file(self.factory.filename)
+		elif self.factory.cmd == 'send':
+			self._send_file(self.factory.files_path, self.factory.filename)
 		
 	def connectionLost(self, reason):
 		self.file_handler = None
 		self.file_data = ()
 		
 		print 'Connection to the server has been lost'
-		reactor.stop()
+		if reactor.running:
+			reactor.stop()
 	
 	def lineReceived(self, line):
 		if line == 'ENDMSG':
 			self.factory.deferred.callback(self.buffer)
 			self.buffer = []
-		elif line.startswith('HASH'):
+		if line.startswith('HASH'):
 			# Received a file name and hash, server is sending us a file
 			data = clean_and_split_input(line)
 
@@ -175,8 +108,10 @@ class FileTransferProtocol(basic.LineReceiver):
 class FileTransferClientFactory(protocol.ClientFactory):
 	protocol = FileTransferProtocol
 	
-	def __init__(self, files_path):
+	def __init__(self, cmd, files_path, filename):
+		self.cmd = cmd
 		self.files_path = files_path
+		self.filename = filename
 		self.deferred = defer.Deferred()
 
 def get_dir_changes(directory):
@@ -213,21 +148,13 @@ def parse_new_dir(directory, pwd, key):
 			else:
 				encrypt_file(key, root + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + file).hexdigest())
 
-class Client():
-	def __init__(self, cfg):
-		self.config = ConfigParser.ConfigParser()
-		self.config.readfp(open(cfg))
-		self.configport = int(self.config.get('client', 'port'))
-		self.configpath = self.config.get('client', 'path')
-		self.configip = self.config.get('client', 'ip')
-		self.password = self.config.get('client', 'password')
-		self.enc_key = hashlib.sha256(self.password).digest()
-	
-	def connect(self):
-		print 'Client started, incoming files will be saved to %s' % (c.configpath)
-		stdio.StandardIO(CommandLineProtocol(self.configip, self.configport, self.configpath))
-		reactor.run()
-
 if __name__ == '__main__':
-	c = Client('client.cfg')
-	c.connect()
+	defer.setDebugging(True)
+	files = [
+		('localhost', 5001, 'get', 'clientdir', 'test.txt'),
+		('localhost', 5001, 'send', 'clientdir', 'joke.png')
+	]
+	file_count = len(files)
+	for x in files:
+		reactor.connectTCP(x[0], x[1], FileTransferClientFactory(x[2], x[3], x[4]))
+	reactor.run()
