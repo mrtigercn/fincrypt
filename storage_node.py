@@ -1,9 +1,13 @@
 import os, ConfigParser
+import json
+from urllib2 import urlopen
 
 from twisted.internet import reactor, protocol
 from twisted.protocols import basic
 
 from common import COMMANDS, display_message, validate_file_md5_hash, get_file_md5_hash, read_bytes_from_file, clean_and_split_input
+
+import pickle, base64
 
 class FileTransferProtocol(basic.LineReceiver):
 	delimiter = '\n'
@@ -167,7 +171,36 @@ class FileTransferServerFactory(protocol.ServerFactory):
 		
 		self.clients = []
 		self.files = None
+
+class StorageNodeMediatorClientProtocol(basic.LineReceiver):
+	delimiter = '\n'
 	
+	def connectionMade(self):
+		self.setLineMode()
+		print "Connected to the Mediator Server"
+		self.transport.write("Node Type - Storage\n")
+	
+	def lineReceived(self, line):
+		print line
+		if line == 'get details':
+			self.transport.write("""Storage Details%s\n""" % (base64.b64encode(pickle.dumps([self.factory.ip, self.factory.port,freespace(self.factory.configpath)])),))
+
+class StorageNodeMediatorClientFactory(protocol.ClientFactory):
+	protocol = StorageNodeMediatorClientProtocol
+	
+	def __init__(self, configpath, configport):
+		self.configpath = configpath
+		self.ip = publicip()
+		self.port = configport
+
+def freespace(folder):
+	s = os.statvfs(folder)
+	return s.f_bsize * s.f_bavail
+
+def publicip():
+	#return json.load(urlopen('http://httpbin.org/ip'))['origin']
+	return 'localhost'
+
 if __name__ == '__main__':
 	config = ConfigParser.ConfigParser()
 	config.readfp(open('storage.cfg'))
@@ -177,4 +210,5 @@ if __name__ == '__main__':
 	display_message('Listening on port %d, serving files from directory: %s' % (configport, configpath))
 	
 	reactor.listenTCP(configport, FileTransferServerFactory(configpath))
+	reactor.connectTCP('localhost', 8001, StorageNodeMediatorClientFactory(configpath, configport))
 	reactor.run()
