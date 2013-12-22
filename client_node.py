@@ -10,6 +10,8 @@ from dirtools import Dir, DirState
 import hashlib
 from file_encrypt import encrypt_file, decrypt_file
 
+from Crypto.PublicKey import RSA
+
 class FileTransferProtocol(basic.LineReceiver):
 	delimiter = '\n'
 	
@@ -159,9 +161,27 @@ def parse_tmp_dir(directory):
 			tmp_files.append((root, file))
 	return tmp_files
 
+def get_rsa_key(config):
+	try:
+		rsa_key_file = config.get('client', 'rsa_file')
+		rsa_file = open(rsa_key_file, 'r')
+		rsa_key = RSA.importKey(rsa_file.read())
+		rsa_file.close()
+	except ConfigParser.NoOptionError:
+		rsa_key_file = 'client.key'
+		config.set('client', 'rsa_file', rsa_key_file)
+		rsa_key = RSA.generate(4096)
+		rsa_file = open(rsa_key_file, 'w')
+		rsa_file.write(rsa_key.exportKey())
+		rsa_file.close()
+	return rsa_key
+
 if __name__ == '__main__':
 	# What follows is a bunch of hardcoded stuff while building the system.
-	clientdir = 'clientdir'
+	config = ConfigParser.ConfigParser()
+	config.readfp(open('client.cfg'))
+	clientdir = config.get('client', 'path')
+	rsa_key = get_rsa_key(config)
 	passsword = 'password123'
 	key = hashlib.sha256(password).digest()
 	gdc = get_dir_changes(clientdir)

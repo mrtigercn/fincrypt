@@ -9,6 +9,8 @@ from common import COMMANDS, display_message, validate_file_md5_hash, get_file_m
 
 import pickle, base64
 
+from Crypto.PublicKey import RSA
+
 class FileTransferProtocol(basic.LineReceiver):
 	delimiter = '\n'
 
@@ -178,20 +180,27 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 	def connectionMade(self):
 		self.setLineMode()
 		print "Connected to the Mediator Server"
-		self.transport.write("Node Type - Storage\n")
 	
 	def lineReceived(self, line):
 		print line
-		if line == 'get details':
-			self.transport.write("""Storage Details%s\n""" % (base64.b64encode(pickle.dumps([self.factory.ip, self.factory.port,freespace(self.factory.configpath)])),))
+		if line == 'REGISTER':
+			register_details = self.mediator_details()
+			self.transport.write(register_details + '\n')
+	
+	def mediator_details(self):
+		detail_string = base64.b64encode(pickle.dumps(('STORAGE', self.factory.ip, self.factory.port,freespace(self.factory.configpath))))
+		signature = self.factory.rsa_key.sign(detail_string, "")
+		public_key = self.factory.rsa_key.publickey()
+		return base64.b64encode(pickle.dumps((public_key, detail_string, signature)))
 
 class StorageNodeMediatorClientFactory(protocol.ClientFactory):
 	protocol = StorageNodeMediatorClientProtocol
 	
-	def __init__(self, configpath, configport):
+	def __init__(self, configpath, configport, rsa_key):
 		self.configpath = configpath
 		self.ip = publicip()
 		self.port = configport
+		self.rsa_key = rsa_key
 
 def freespace(folder):
 	s = os.statvfs(folder)
@@ -201,14 +210,30 @@ def publicip():
 	#return json.load(urlopen('http://httpbin.org/ip'))['origin']
 	return 'localhost'
 
+def get_rsa_key(config):
+	try:
+		rsa_key_file = config.get('storage', 'rsa_file')
+		rsa_file = open(rsa_key_file, 'r')
+		rsa_key = RSA.importKey(rsa_file.read())
+		rsa_file.close()
+	except ConfigParser.NoOptionError:
+		rsa_key_file = 'storage.key'
+		config.set('storage', 'rsa_file', rsa_key_file)
+		rsa_key = RSA.generate(4096)
+		rsa_file = open(rsa_key_file, 'w')
+		rsa_file.write(rsa_key.exportKey())
+		rsa_file.close()
+	return rsa_key
+
 if __name__ == '__main__':
 	config = ConfigParser.ConfigParser()
 	config.readfp(open('storage.cfg'))
 	configport = int(config.get('storage', 'port'))
 	configpath = config.get('storage', 'path')
+	rsa_key = get_rsa_key(config)
 	
 	display_message('Listening on port %d, serving files from directory: %s' % (configport, configpath))
 	
 	reactor.listenTCP(configport, FileTransferServerFactory(configpath))
-	reactor.connectTCP('localhost', 8001, StorageNodeMediatorClientFactory(configpath, configport))
+	reactor.connectTCP('localhost', 8001, StorageNodeMediatorClientFactory(configpath, configport, rsa_key))
 	reactor.run()
