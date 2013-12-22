@@ -193,7 +193,8 @@ class MediatorClientProtocol(basic.LineReceiver):
 			self.transport.write(self.file_changes() + '\n')
 		else:
 			try:
-				print pickle.loads(base64.b64decode(line))
+				data = pickle.loads(base64.b64decode(line))
+				reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', 'clientdir/tmp~', data[2]))
 			except:
 				print line
 	
@@ -236,6 +237,7 @@ if __name__ == '__main__':
 	else:
 		parse_dir_changes(clientdir, gdc, enc_pwd, key)
 	tmp_files = parse_tmp_dir(clientdir)
+	file_count = len(tmp_files)
 	defer.setDebugging(True)
 	reactor.connectTCP('localhost', 8001, MediatorClientFactory(clientdir, rsa_key, tmp_files, 1))
 	#files = [
