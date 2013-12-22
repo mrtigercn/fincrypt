@@ -148,11 +148,32 @@ def parse_new_dir(directory, pwd, key):
 			else:
 				encrypt_file(key, root + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + file).hexdigest())
 
+def parse_tmp_dir(directory):
+	directory = directory + '/tmp~'
+	if not os.path.exists(directory):
+		return []
+	d = Dir(directory)
+	tmp_files = []
+	for root, dirs, files in d.walk():
+		for file in files:
+			tmp_files.append((root, file))
+	return tmp_files
+
 if __name__ == '__main__':
+	# What follows is a bunch of hardcoded stuff while building the system.
+	clientdir = 'clientdir'
+	passsword = 'password123'
+	key = hashlib.sha256(password).digest()
+	gdc = get_dir_changes(clientdir)
+	if gdc == 'new':
+		parse_new_dir(clientdir, password, key)
+	else:
+		parse_dir_changes(clientdir, gdc, password, key)
+	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
 	files = [
-		('localhost', 5001, 'get', 'clientdir', 'test.txt'),
-		('localhost', 5001, 'send', 'clientdir', 'joke.png')
+		('162.243.36.143', 5001, 'send', 'clientdir', 'test.txt'),
+		('162.243.36.143', 5001, 'send', 'clientdir', 'joke.png')
 	]
 	file_count = len(files)
 	for x in files:
