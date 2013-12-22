@@ -4,10 +4,12 @@ from twisted.internet import reactor, protocol, stdio, defer
 from twisted.protocols import basic
 from twisted.internet.protocol import ClientFactory
 
-from common import COMMANDS, display_message, validate_file_md5_hash, get_file_md5_hash, read_bytes_from_file, clean_and_split_input
+from common import COMMANDS, display_message, validate_file_md5_hash, get_file_md5_hash, read_bytes_from_file, clean_and_split_input, get_file_sha256_hash, validate_file_sha256_hash
 
 from dirtools import Dir, DirState
-import hashlib
+
+import hashlib, base64, pickle
+
 from file_encrypt import encrypt_file, decrypt_file
 
 from Crypto.PublicKey import RSA
@@ -134,10 +136,10 @@ def parse_dir_changes(directory, changes, pwd, key):
 	if not os.path.exists(directory + '/tmp~'):
 		os.makedirs(directory + '/tmp~')
 	for file in changes['created'] + changes['updated']:
-		if file[-1] == '~':
+		if file[-1] == '~' or file[0:4] == 'tmp~':
 			continue
 		else:
-			encrypt_file(key, directory + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + file).hexdigest())
+			encrypt_file(key, directory + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + root + file).hexdigest())
 
 def parse_new_dir(directory, pwd, key):
 	if not os.path.exists(directory + '/tmp~'):
@@ -148,7 +150,7 @@ def parse_new_dir(directory, pwd, key):
 			if file[-1] == '~' or root[-1] == '~':
 				continue
 			else:
-				encrypt_file(key, root + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + file).hexdigest())
+				encrypt_file(key, root + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + root + file).hexdigest())
 
 def parse_tmp_dir(directory):
 	directory = directory + '/tmp~'
@@ -158,7 +160,7 @@ def parse_tmp_dir(directory):
 	tmp_files = []
 	for root, dirs, files in d.walk():
 		for file in files:
-			tmp_files.append((root, file))
+			tmp_files.append((root, file, os.stat(root + '/' + file).st_size, get_file_sha256_hash(root + '/' + file)))
 	return tmp_files
 
 def get_rsa_key(config):
@@ -176,26 +178,71 @@ def get_rsa_key(config):
 		rsa_file.close()
 	return rsa_key
 
+class MediatorClientProtocol(basic.LineReceiver):
+	delimiter = '\n'
+	
+	def connectionMade(self):
+		self.setLineMode()
+		print "Connected to the Mediator Server"
+	
+	def lineReceived(self, line):
+		if line == 'REGISTER':
+			register_details = self.mediator_details()
+			self.transport.write(register_details + '\n')
+		elif line == 'Confirmed Registration':
+			self.transport.write(self.file_changes() + '\n')
+		else:
+			try:
+				print pickle.loads(base64.b64decode(line))
+			except:
+				print line
+	
+	def file_changes(self):
+		change_list = []
+		for x in self.factory.files:
+			change_list.append((x[1], x[2], x[3]))
+		change_list = base64.b64encode(pickle.dumps(change_list))
+		signature = self.factory.rsa_key.sign(hashlib.sha256(change_list).hexdigest(), "")
+		return base64.b64encode(pickle.dumps((change_list, signature)))
+	
+	def mediator_details(self):
+		detail_string = base64.b64encode(pickle.dumps(('CLIENT', self.factory.redundancy)))
+		signature = self.factory.rsa_key.sign(detail_string, "")
+		public_key = self.factory.rsa_key.publickey()
+		return base64.b64encode(pickle.dumps((public_key, detail_string, signature)))
+
+class MediatorClientFactory(protocol.ClientFactory):
+	protocol = MediatorClientProtocol
+	
+	def __init__(self, clientdir, rsa_key, files, redundancy):
+		self.clientdir = clientdir
+		self.rsa_key = rsa_key
+		self.files = files
+		self.file_count = len(self.files)
+		self.enc_pwd = enc_pwd
+		self.redundancy = redundancy
+
 if __name__ == '__main__':
-	# What follows is a bunch of hardcoded stuff while building the system.
+	# What follows is a bunch of hardcoded stuff for use while building the system.
 	config = ConfigParser.ConfigParser()
 	config.readfp(open('client.cfg'))
 	clientdir = config.get('client', 'path')
 	rsa_key = get_rsa_key(config)
-	passsword = 'password123'
-	key = hashlib.sha256(password).digest()
+	enc_pwd = config.get('client', 'password')
+	key = hashlib.sha256(enc_pwd).digest()
 	gdc = get_dir_changes(clientdir)
 	if gdc == 'new':
-		parse_new_dir(clientdir, password, key)
+		parse_new_dir(clientdir, enc_pwd, key)
 	else:
-		parse_dir_changes(clientdir, gdc, password, key)
+		parse_dir_changes(clientdir, gdc, enc_pwd, key)
 	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
-	files = [
-		('162.243.36.143', 5001, 'send', 'clientdir', 'test.txt'),
-		('162.243.36.143', 5001, 'send', 'clientdir', 'joke.png')
-	]
-	file_count = len(files)
-	for x in files:
-		reactor.connectTCP(x[0], x[1], FileTransferClientFactory(x[2], x[3], x[4]))
+	reactor.connectTCP('localhost', 8001, MediatorClientFactory(clientdir, rsa_key, tmp_files, 1))
+	#files = [
+	#	('162.243.36.143', 5001, 'send', 'clientdir', 'test.txt'),
+	#	('162.243.36.143', 5001, 'send', 'clientdir', 'joke.png')
+	#]
+	#file_count = len(files)
+	#for x in files:
+	#	reactor.connectTCP(x[0], x[1], FileTransferClientFactory(x[2], x[3], x[4]))
 	reactor.run()
