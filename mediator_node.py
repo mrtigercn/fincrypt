@@ -51,9 +51,17 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 					self.factory.files[x[0]]['snodes']['list'] = []
 					snodes = self.factory.storage_nodes.items()
 					random.shuffle(snodes)
-					for y in range(self.redundancy):
-						self.factory.files[x[0]]['snodes'][snodes[y][0]] = {}
-						self.factory.files[x[0]]['snodes']['list'].append(snodes[y][0])
+					found = 0
+					y = 0
+					while found < self.redundancy:
+						if self.factory.storage_nodes[snodes[y][0]].freespace >= x[1]:
+							self.factory.storage_nodes[snodes[y][0]].transport.write("NEWFILE\n")
+							self.factory.storage_nodes[snodes[y][0]].transport.write(base64.b64encode(pickle.dumps((x[0],x[1],self.publickey))) + "\n")
+							self.factory.storage_nodes[snodes[y][0]].state = 'REGISTER'
+							self.factory.files[x[0]]['snodes'][snodes[y][0]] = {}
+							self.factory.files[x[0]]['snodes']['list'].append(snodes[y][0])
+							found += 1
+						y += 1
 				first_snode = self.factory.files[x[0]]['snodes']['list'][0]
 				init_ip = self.factory.storage_nodes[first_snode].ip
 				init_port = self.factory.storage_nodes[first_snode].port

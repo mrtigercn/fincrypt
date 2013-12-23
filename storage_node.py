@@ -115,7 +115,7 @@ class FileTransferProtocol(basic.LineReceiver):
 			self.file_handler = None
 			
 			if validate_file_md5_hash(file_path, self.file_data[1]):
-				self.transport.write('File was successfully transfered and saved\n')
+				self.transport.write('Successful Transfer\n')
 				self.transport.write('ENDMSG\n')
 				
 				display_message('File %s has been successfully transfered' % (filename))
@@ -180,12 +180,24 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 	def connectionMade(self):
 		self.setLineMode()
 		print "Connected to the Mediator Server"
+		self.state = 'REGISTER'
 	
 	def lineReceived(self, line):
-		print line
+		if self.state == 'NEWFILE':
+			self.handle_NEWFILE(line)
 		if line == 'REGISTER':
 			register_details = self.mediator_details()
 			self.transport.write(register_details + '\n')
+		elif line == 'NEWFILE':
+			self.state = 'NEWFILE'
+	
+	def handle_NEWFILE(self, line):
+		filename, size, pubkey = pickle.loads(base64.b64decode(line))
+		print (filename, size, pubkey)
+		global new_files
+		new_files[filename] = (pubkey, size)
+		self.transport.write(self.mediator_details() + '\n')
+		self.state = 'REGISTER'
 	
 	def mediator_details(self):
 		detail_string = base64.b64encode(pickle.dumps(('STORAGE', self.factory.ip, self.factory.port,freespace(self.factory.configpath))))
@@ -204,7 +216,11 @@ class StorageNodeMediatorClientFactory(protocol.ClientFactory):
 
 def freespace(folder):
 	s = os.statvfs(folder)
-	return s.f_bsize * s.f_bavail
+	actual_space = s.f_bsize * s.f_bavail
+	promised_space = 0
+	for key in new_files:
+		promised_space += new_files[key][1]
+	return actual_space - promised_space
 
 def publicip():
 	#return json.load(urlopen('http://httpbin.org/ip'))['origin']
@@ -224,6 +240,8 @@ def get_rsa_key(config):
 		rsa_file.write(rsa_key.exportKey())
 		rsa_file.close()
 	return rsa_key
+
+new_files = {}
 
 if __name__ == '__main__':
 	config = ConfigParser.ConfigParser()
