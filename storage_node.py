@@ -33,7 +33,7 @@ class FileTransferProtocol(basic.LineReceiver):
 		display_message('Connection from %s lost (%d clients left)' % (self.transport.getPeer().host, len(self.factory.clients)))
 
 	def lineReceived(self, line):
-		display_message('Received the following line from the client [%s]: %s' % (self.transport.getPeer().host, line))
+		#display_message('Received the following line from the client [%s]: %s' % (self.transport.getPeer().host, line))
 		
 		data = self._cleanAndSplitInput(line)
 		if len(data) == 0 or data == '':
@@ -114,6 +114,7 @@ class FileTransferProtocol(basic.LineReceiver):
 			
 			self.file_handler.close()
 			self.file_handler = None
+			print new_files
 			
 			if validate_file_md5_hash(file_path, self.file_data[1]):
 				if filename in new_files and new_files[filename][0].verify(self.file_data[1],self.file_data[2]):
@@ -121,6 +122,8 @@ class FileTransferProtocol(basic.LineReceiver):
 					self.transport.write('ENDMSG\n')
 				
 					display_message('File %s has been successfully transfered' % (filename))
+					
+					del new_files[filename]
 				else:
 					display_message('Public Key Signature not valid')
 					self.transport.write('Invalid Public Key Signature\n')
@@ -201,7 +204,7 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 		print (filename, size, pubkey)
 		global new_files
 		new_files[filename] = (pubkey, size)
-		self.transport.write(self.mediator_details() + '\n')
+		#self.transport.write(self.mediator_details() + '\n')
 		self.state = 'REGISTER'
 	
 	def mediator_details(self):
@@ -254,6 +257,7 @@ if __name__ == '__main__':
 	configport = int(config.get('storage', 'port'))
 	configpath = config.get('storage', 'path')
 	rsa_key = get_rsa_key(config)
+	config.write(open('storage.cfg', 'wb'))
 	
 	display_message('Listening on port %d, serving files from directory: %s' % (configport, configpath))
 	

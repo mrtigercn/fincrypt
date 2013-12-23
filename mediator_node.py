@@ -41,6 +41,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 		self.detail_string, self.signature = pickle.loads(base64.b64decode(line))
 		if self.publickey.verify(hashlib.sha256(self.detail_string).hexdigest(), self.signature):
 			data = pickle.loads(base64.b64decode(self.detail_string))
+			print data
 			for x in data:
 				if x[0] not in self.factory.files:
 					self.factory.files[x[0]] = {}
@@ -55,14 +56,15 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 					y = 0
 					while found < self.redundancy:
 						if self.factory.storage_nodes[snodes[y][0]].freespace >= x[1]:
-							self.factory.storage_nodes[snodes[y][0]].transport.write("NEWFILE\n")
-							self.factory.storage_nodes[snodes[y][0]].transport.write(base64.b64encode(pickle.dumps((x[0],x[1],self.publickey))) + "\n")
-							self.factory.storage_nodes[snodes[y][0]].state = 'REGISTER'
+							#self.factory.storage_nodes[snodes[y][0]].state = 'REGISTER'
 							self.factory.files[x[0]]['snodes'][snodes[y][0]] = {}
 							self.factory.files[x[0]]['snodes']['list'].append(snodes[y][0])
 							found += 1
 						y += 1
+						print found, y
 				first_snode = self.factory.files[x[0]]['snodes']['list'][0]
+				self.factory.storage_nodes[first_snode].transport.write("NEWFILE\n")
+				self.factory.storage_nodes[first_snode].transport.write(base64.b64encode(pickle.dumps((x[0],x[1],self.publickey))) + "\n")
 				init_ip = self.factory.storage_nodes[first_snode].ip
 				init_port = self.factory.storage_nodes[first_snode].port
 				filename = x[0]
@@ -129,6 +131,7 @@ if __name__ == '__main__':
 	config.readfp(open('mediator.cfg'))
 	configport = int(config.get('mediator', 'port'))
 	rsa_key = get_rsa_key(config)
+	config.write(open('mediator.cfg', 'wb'))
 	
 	reactor.listenTCP(configport, FincryptMediatorFactory())
 	reactor.run()

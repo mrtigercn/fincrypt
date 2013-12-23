@@ -243,12 +243,6 @@ if __name__ == '__main__':
 	tmp_files = parse_tmp_dir(clientdir)
 	file_count = len(tmp_files)
 	defer.setDebugging(True)
+	config.write(open('client.cfg', 'wb'))
 	reactor.connectTCP('localhost', 8001, MediatorClientFactory(clientdir, rsa_key, tmp_files, 1))
-	#files = [
-	#	('162.243.36.143', 5001, 'send', 'clientdir', 'test.txt'),
-	#	('162.243.36.143', 5001, 'send', 'clientdir', 'joke.png')
-	#]
-	#file_count = len(files)
-	#for x in files:
-	#	reactor.connectTCP(x[0], x[1], FileTransferClientFactory(x[2], x[3], x[4]))
 	reactor.run()
