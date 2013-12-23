@@ -76,12 +76,13 @@ class FileTransferProtocol(basic.LineReceiver):
 			try:
 				filename = data[1]
 				file_hash = data[2]
+				signed_hash = pickle.loads(base64.b64decode(data[3]))
 			except IndexError:
 				self.transport.write('Missing filename or file MD5 hash\n')
 				self.transport.write('ENDMSG\n')
 				return
 
-			self.file_data = (filename, file_hash)
+			self.file_data = (filename, file_hash, signed_hash)
 			
 			# Switch to the raw mode (for receiving binary data)
 			print 'Receiving file: %s' % (filename)
@@ -115,10 +116,14 @@ class FileTransferProtocol(basic.LineReceiver):
 			self.file_handler = None
 			
 			if validate_file_md5_hash(file_path, self.file_data[1]):
-				self.transport.write('Successful Transfer\n')
-				self.transport.write('ENDMSG\n')
+				if filename in new_files and new_files[filename][0].verify(self.file_data[1],self.file_data[2]):
+					self.transport.write('Successful Transfer\n')
+					self.transport.write('ENDMSG\n')
 				
-				display_message('File %s has been successfully transfered' % (filename))
+					display_message('File %s has been successfully transfered' % (filename))
+				else:
+					display_message('Public Key Signature not valid')
+					self.transport.write('Invalid Public Key Signature\n')
 			else:
 				os.unlink(file_path)
 				self.transport.write('File was successfully transfered but not saved, due to invalid MD5 hash\n')

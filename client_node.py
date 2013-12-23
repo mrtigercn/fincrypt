@@ -37,7 +37,11 @@ class FileTransferProtocol(basic.LineReceiver):
 		
 		print 'Uploading file: %s (%d KB)' % (filename, file_size)
 		
-		self.transport.write('PUT %s %s\n' % (filename, get_file_md5_hash(file_path)))
+		global rsa_key
+		md5_hash = get_file_md5_hash(file_path)
+		signature = rsa_key.sign(md5_hash, '')
+		
+		self.transport.write('PUT %s %s %s\n' % (filename, md5_hash, base64.b64encode(pickle.dumps(signature))))
 		#self.setRawMode()
 		for bytes in read_bytes_from_file(file_path):
 			self.transport.write(bytes)
