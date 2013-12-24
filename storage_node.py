@@ -13,7 +13,7 @@ from Crypto.PublicKey import RSA
 
 class FileTransferProtocol(basic.LineReceiver):
 	delimiter = '\n'
-
+	
 	def connectionMade(self):
 		self.factory.clients.append(self)
 		self.file_handler = None
@@ -114,7 +114,6 @@ class FileTransferProtocol(basic.LineReceiver):
 			
 			self.file_handler.close()
 			self.file_handler = None
-			print new_files
 			
 			if validate_file_md5_hash(file_path, self.file_data[1]):
 				if filename in new_files and new_files[filename][0].verify(self.file_data[1],self.file_data[2]):
@@ -123,7 +122,10 @@ class FileTransferProtocol(basic.LineReceiver):
 				
 					display_message('File %s has been successfully transfered' % (filename))
 					
+					self.factory.message_siblings(new_files[filename][2], 'FILESENT' + filename + '\n')
+					
 					del new_files[filename]
+					
 				else:
 					display_message('Public Key Signature not valid')
 					self.transport.write('Invalid Public Key Signature\n')
@@ -181,6 +183,9 @@ class FileTransferServerFactory(protocol.ServerFactory):
 		
 		self.clients = []
 		self.files = None
+		
+	def message_siblings(self, name, message):
+		self.root.message_children(self.name, name, message)
 
 class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 	delimiter = '\n'
@@ -193,18 +198,25 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 	def lineReceived(self, line):
 		if self.state == 'NEWFILE':
 			self.handle_NEWFILE(line)
+		elif self.state == 'MEDREG':
+			self.handle_MEDREG(line)
 		if line == 'REGISTER':
 			register_details = self.mediator_details()
 			self.transport.write(register_details + '\n')
 		elif line == 'NEWFILE':
 			self.state = 'NEWFILE'
+		elif line == 'Registering...':
+			self.state = 'MEDREG'
+	
+	def handle_MEDREG(self, line):
+		self.factory.mediators[line] = self
 	
 	def handle_NEWFILE(self, line):
-		filename, size, pubkey = pickle.loads(base64.b64decode(line))
+		filename, size, pubkey, medpub = pickle.loads(base64.b64decode(line))
 		print (filename, size, pubkey)
 		global new_files
-		new_files[filename] = (pubkey, size)
-		#self.transport.write(self.mediator_details() + '\n')
+		new_files[filename] = (pubkey, size, medpub)
+		self.transport.write(self.mediator_details() + '\n')
 		self.state = 'REGISTER'
 	
 	def mediator_details(self):
@@ -221,6 +233,11 @@ class StorageNodeMediatorClientFactory(protocol.ClientFactory):
 		self.ip = publicip()
 		self.port = configport
 		self.rsa_key = rsa_key
+		self.mediators = {}
+	
+	def get_message(self, name, message):
+		if message[0:8] == 'FILESENT':
+			self.mediators[''.join(name.splitlines())].transport.write(message)
 
 def freespace(folder):
 	s = os.statvfs(folder)
@@ -251,6 +268,24 @@ def get_rsa_key(config):
 
 new_files = {}
 
+class FactoryContainer(object):
+	def __init__(self):
+		self.servers = {}
+	
+	def add_child(self, obj, name):
+		self.servers[name] = obj
+		self.servers[name].root = self
+		self.servers[name].name = name
+	
+	def message_children(self, sender, recipient, message):
+		for server in self.servers:
+			if server != sender:
+				self.servers[server].get_message(recipient, message)
+	
+	def message_child(self, name, message):
+		if name in self.servers.keys():
+			self.servers[server].get_message(name, message)
+
 if __name__ == '__main__':
 	config = ConfigParser.ConfigParser()
 	config.readfp(open('storage.cfg'))
@@ -261,6 +296,10 @@ if __name__ == '__main__':
 	
 	display_message('Listening on port %d, serving files from directory: %s' % (configport, configpath))
 	
-	reactor.listenTCP(configport, FileTransferServerFactory(configpath))
-	reactor.connectTCP('localhost', 8001, StorageNodeMediatorClientFactory(configpath, configport, rsa_key))
+	container = FactoryContainer()
+	container.add_child(FileTransferServerFactory(configpath), 'ftpserver')
+	container.add_child(StorageNodeMediatorClientFactory(configpath, configport, rsa_key), 'mediator')
+	reactor.listenTCP(configport, container.servers['ftpserver'])
+	reactor.connectTCP('localhost', 8001, container.servers['mediator'])
+	
 	reactor.run()
