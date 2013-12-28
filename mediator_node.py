@@ -15,7 +15,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	def connectionMade(self):
 		self.setLineMode()
 		print "Client Connected"
-		self.state = 'REGISTER'
 		self.transport.write("""REGISTER\n""")
 	
 	def connectionLost(self, reason):
@@ -29,20 +28,65 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			print "Unregistered Connection Dropped"
 	
 	def lineReceived(self, line):
-		if line[0:8] == 'FILESENT':
-			print line
-		elif self.state == 'REGISTER':
-			self.transport.write("Registering...\n")
-			global rsa_key
-			self.transport.write("%s\n" % (''.join(rsa_key.publickey().exportKey().splitlines()),))
-			self.handle_REGISTER(line)
+		message = self.parse_message(line)
+		cmd, msg = message[0], message[1:]
+		print 'CMD:', cmd
+		if cmd == 'REGISTER':
+			self.handle_REGISTER(msg)
+		elif cmd == 'FILESENT':
+			print msg
+		#if line[0:8] == 'FILESENT':
+		#	print line
+		#elif self.state == 'REGISTER':
+		#	self.transport.write("Registering...\n")
+		#	global rsa_key
+		#	self.transport.write("%s\n" % (''.join(rsa_key.publickey().exportKey().splitlines()),))
+		#	self.handle_REGISTER(line)
 		elif self.state == 'CONNECTED' and self.type == 'CLIENT':
-			self.handle_CLIENT(line)
+			self.handle_CLIENT(msg)
 		elif self.state == 'CONNECTED' and self.type == 'STORAGE':
-			self.handle_STORAGE(line)
+			self.handle_STORAGE(msg)
 	
-	def handle_CLIENT(self, line):
-		self.detail_string, self.signature = pickle.loads(base64.b64decode(line))
+	def handle_REGISTER(self, msg):
+		global rsa_key
+		self.transport.write("Registering...\n")
+		self.transport.write("%s\n" % (''.join(rsa_key.publickey().exportKey().splitlines()),))
+		self.publickey, self.detail_string, self.signature = msg
+		if self.publickey.verify(self.detail_string, self.signature):
+			self.name = hashlib.md5(self.publickey.exportKey()).hexdigest()
+			data = pickle.loads(base64.b64decode(self.detail_string))
+			print 'DATA :', data
+			if data[0] == 'STORAGE':
+				self.type = 'STORAGE'
+				self.state = 'CONNECTED'
+				self.ip = data[1]
+				self.port = data[2]
+				self.freespace = data[3]
+				self.factory.storage_nodes[self.name] = self
+				print 'Storage Node %s connected at %s:%s' % (self.name, self.ip, self.port)
+				self.transport.write("Confirmed Registration\n")
+			else:
+				self.type = 'CLIENT'
+				self.state = 'CONNECTED'
+				self.redundancy = data[1]
+				self.factory.clients[self.name] = self
+				print 'Client Node %s connected' % (self.name)
+				self.transport.write("Confirmed Registration\n")
+		else:
+			self.transport.write("Public Key not verified!\n")
+	
+	def parse_message(self, line):
+		data = pickle.loads(base64.b64decode(line))
+		return data
+	
+	def encode(self, msg):
+		data = base64.b64encode(pickle.dumps(msg))
+		return data
+	
+	def handle_CLIENT(self, msg):
+		for x in msg:
+			print 'X:', x
+		self.detail_string, self.signature = msg
 		if self.publickey.verify(hashlib.sha256(self.detail_string).hexdigest(), self.signature):
 			data = pickle.loads(base64.b64decode(self.detail_string))
 			for x in data:
@@ -77,30 +121,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	
 	def handle_STORAGE(self, line):
 		return
-	
-	def handle_REGISTER(self, line):
-		self.publickey, self.detail_string, self.signature = pickle.loads(base64.b64decode(line))
-		if self.publickey.verify(self.detail_string, self.signature):
-			self.name = hashlib.md5(self.publickey.exportKey()).hexdigest()
-			data = pickle.loads(base64.b64decode(self.detail_string))
-			print data
-			if data[0] == 'STORAGE':
-				self.type = 'STORAGE'
-				self.state = 'CONNECTED'
-				self.ip = data[1]
-				self.port = data[2]
-				self.freespace = data[3]
-				self.factory.storage_nodes[self.name] = self
-				print 'Storage Node %s connected at %s:%s' % (self.name, self.ip, self.port)
-				self.transport.write("Confirmed Registration\n")
-			else:
-				self.type = 'CLIENT'
-				self.state = 'CONNECTED'
-				self.redundancy = data[1]
-				self.factory.clients[self.name] = self
-				self.transport.write("Confirmed Registration\n")
-		else:
-			self.transport.write("Public Key not verified!\n")
 	
 	def rawDataReceived(self, data):
 		print "Uh oh"

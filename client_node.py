@@ -190,6 +190,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 		print "Connected to the Mediator Server"
 	
 	def lineReceived(self, line):
+		print 'LINE:', line
 		if line == 'REGISTER':
 			register_details = self.mediator_details()
 			self.transport.write(register_details + '\n')
@@ -198,7 +199,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 		else:
 			try:
 				data = pickle.loads(base64.b64decode(line))
-				reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', 'clientdir/tmp~', data[2]))
+				reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', self.factory.clientdir + '/tmp~', data[2]))
 			except:
 				print line
 	
@@ -208,13 +209,13 @@ class MediatorClientProtocol(basic.LineReceiver):
 			change_list.append((x[1], x[2], x[3]))
 		change_list = base64.b64encode(pickle.dumps(change_list))
 		signature = self.factory.rsa_key.sign(hashlib.sha256(change_list).hexdigest(), "")
-		return base64.b64encode(pickle.dumps((change_list, signature)))
+		return base64.b64encode(pickle.dumps(('CLIENTFILES', change_list, signature)))
 	
 	def mediator_details(self):
 		detail_string = base64.b64encode(pickle.dumps(('CLIENT', self.factory.redundancy)))
 		signature = self.factory.rsa_key.sign(detail_string, "")
 		public_key = self.factory.rsa_key.publickey()
-		return base64.b64encode(pickle.dumps((public_key, detail_string, signature)))
+		return base64.b64encode(pickle.dumps(('REGISTER', public_key, detail_string, signature)))
 
 class MediatorClientFactory(protocol.ClientFactory):
 	protocol = MediatorClientProtocol

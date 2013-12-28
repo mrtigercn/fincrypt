@@ -122,7 +122,7 @@ class FileTransferProtocol(basic.LineReceiver):
 				
 					display_message('File %s has been successfully transfered' % (filename))
 					
-					self.factory.message_siblings(new_files[filename][2], 'FILESENT' + filename + '\n')
+					self.factory.message_siblings(new_files[filename][2], 'FILESENT' + filename)
 					
 					del new_files[filename]
 					
@@ -208,6 +208,14 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 		elif line == 'Registering...':
 			self.state = 'MEDREG'
 	
+	def parse_message(self, line):
+		data = pickle.loads(base64.b64decode(line))
+		return data
+	
+	def encode(self, msg):
+		data = base64.b64encode(pickle.dumps(msg))
+		return data
+	
 	def handle_MEDREG(self, line):
 		self.factory.mediators[line] = self
 	
@@ -220,10 +228,10 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 		self.state = 'REGISTER'
 	
 	def mediator_details(self):
-		detail_string = base64.b64encode(pickle.dumps(('STORAGE', self.factory.ip, self.factory.port,freespace(self.factory.configpath))))
+		detail_string = self.encode(('STORAGE', self.factory.ip, self.factory.port,freespace(self.factory.configpath)))
 		signature = self.factory.rsa_key.sign(detail_string, "")
 		public_key = self.factory.rsa_key.publickey()
-		return base64.b64encode(pickle.dumps((public_key, detail_string, signature)))
+		return self.encode(('REGISTER', public_key, detail_string, signature))
 
 class StorageNodeMediatorClientFactory(protocol.ClientFactory):
 	protocol = StorageNodeMediatorClientProtocol
@@ -237,7 +245,7 @@ class StorageNodeMediatorClientFactory(protocol.ClientFactory):
 	
 	def get_message(self, name, message):
 		if message[0:8] == 'FILESENT':
-			self.mediators[''.join(name.splitlines())].transport.write(message)
+			self.mediators[''.join(name.splitlines())].transport.write(base64.b64encode(pickle.dumps((message[0:8], message[8:]))) + '\n')
 
 def freespace(folder):
 	s = os.statvfs(folder)
