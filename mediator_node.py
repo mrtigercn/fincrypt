@@ -35,13 +35,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.handle_REGISTER(msg)
 		elif cmd == 'FILESENT':
 			print msg
-		#if line[0:8] == 'FILESENT':
-		#	print line
-		#elif self.state == 'REGISTER':
-		#	self.transport.write("Registering...\n")
-		#	global rsa_key
-		#	self.transport.write("%s\n" % (''.join(rsa_key.publickey().exportKey().splitlines()),))
-		#	self.handle_REGISTER(line)
 		elif self.state == 'CONNECTED' and self.type == 'CLIENT':
 			self.handle_CLIENT(msg)
 		elif self.state == 'CONNECTED' and self.type == 'STORAGE':
@@ -55,7 +48,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 		if self.publickey.verify(self.detail_string, self.signature):
 			self.name = hashlib.md5(self.publickey.exportKey()).hexdigest()
 			data = pickle.loads(base64.b64decode(self.detail_string))
-			print 'DATA :', data
 			if data[0] == 'STORAGE':
 				self.type = 'STORAGE'
 				self.state = 'CONNECTED'
@@ -85,7 +77,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	
 	def handle_CLIENT(self, msg):
 		for x in msg:
-			print 'X:', x
 		self.detail_string, self.signature = msg
 		if self.publickey.verify(hashlib.sha256(self.detail_string).hexdigest(), self.signature):
 			data = pickle.loads(base64.b64decode(self.detail_string))
@@ -119,7 +110,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 		else:
 			self.transport.write("Error! Public key not verified!\n")
 	
-	def handle_STORAGE(self, line):
+	def handle_STORAGE(self, msg):
 		return
 	
 	def rawDataReceived(self, data):
