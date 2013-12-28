@@ -190,18 +190,26 @@ class MediatorClientProtocol(basic.LineReceiver):
 		print "Connected to the Mediator Server"
 	
 	def lineReceived(self, line):
-		print 'LINE:', line
-		if line == 'REGISTER':
+		msg = self.parse_message(line)
+		cmd, msg = msg[0], msg[1:]
+		if cmd == 'REGISTER':
 			register_details = self.mediator_details()
 			self.transport.write(register_details + '\n')
-		elif line == 'Confirmed Registration':
+		elif cmd == 'REG_CONFIRM':
 			self.transport.write(self.file_changes() + '\n')
+		elif cmd == 'STORAGE_DETAILS':
+			data = pickle.loads(base64.b64decode(msg[0]))
+			reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', self.factory.clientdir + '/tmp~', data[2]))
 		else:
-			try:
-				data = pickle.loads(base64.b64decode(line))
-				reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', self.factory.clientdir + '/tmp~', data[2]))
-			except:
-				print line
+			print msg
+	
+	def parse_message(self, line):
+		data = pickle.loads(base64.b64decode(line))
+		return data
+	
+	def encode(self, msg):
+		data = base64.b64encode(pickle.dumps(msg))
+		return data
 	
 	def file_changes(self):
 		change_list = []

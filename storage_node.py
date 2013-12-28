@@ -196,17 +196,17 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 		self.state = 'REGISTER'
 	
 	def lineReceived(self, line):
-		if self.state == 'NEWFILE':
-			self.handle_NEWFILE(line)
-		elif self.state == 'MEDREG':
-			self.handle_MEDREG(line)
-		if line == 'REGISTER':
+		msg = self.parse_message(line)
+		cmd, msg = msg[0], msg[1:]
+		if cmd == 'NEWFILE':
+			self.handle_NEWFILE(msg)
+		elif cmd == 'MEDREG':
+			self.handle_MEDREG(msg)
+		elif cmd == 'REGISTER':
 			register_details = self.mediator_details()
 			self.transport.write(register_details + '\n')
-		elif line == 'NEWFILE':
-			self.state = 'NEWFILE'
-		elif line == 'Registering...':
-			self.state = 'MEDREG'
+		elif cmd == 'PRINT':
+			print 'msg:', msg
 	
 	def parse_message(self, line):
 		data = pickle.loads(base64.b64decode(line))
@@ -216,16 +216,17 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 		data = base64.b64encode(pickle.dumps(msg))
 		return data
 	
-	def handle_MEDREG(self, line):
-		self.factory.mediators[line] = self
+	def handle_MEDREG(self, msg):
+		self.factory.mediators[msg[0]] = self
 	
-	def handle_NEWFILE(self, line):
-		filename, size, pubkey, medpub = pickle.loads(base64.b64decode(line))
-		print (filename, size, pubkey)
+	def handle_NEWFILE(self, msg):
+		filename, size, pubkey, medpub = msg
+		print filename, size, pubkey
 		global new_files
 		new_files[filename] = (pubkey, size, medpub)
 		self.transport.write(self.mediator_details() + '\n')
-		self.state = 'REGISTER'
+		register_details = self.mediator_details()
+		self.transport.write(register_details + '\n')
 	
 	def mediator_details(self):
 		detail_string = self.encode(('STORAGE', self.factory.ip, self.factory.port,freespace(self.factory.configpath)))

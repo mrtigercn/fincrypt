@@ -15,7 +15,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	def connectionMade(self):
 		self.setLineMode()
 		print "Client Connected"
-		self.transport.write("""REGISTER\n""")
+		self.transport.write(self.encode(("REGISTER",)) + "\n")
 	
 	def connectionLost(self, reason):
 		if self.type == 'CLIENT':
@@ -42,8 +42,9 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	
 	def handle_REGISTER(self, msg):
 		global rsa_key
-		self.transport.write("Registering...\n")
-		self.transport.write("%s\n" % (''.join(rsa_key.publickey().exportKey().splitlines()),))
+		key_export = ''.join(rsa_key.publickey().exportKey().splitlines())
+		self.transport.write(self.encode(("PRINT", "Registering...")) + "\n")
+		self.transport.write(self.encode(("MEDREG", key_export)) + '\n')
 		self.publickey, self.detail_string, self.signature = msg
 		if self.publickey.verify(self.detail_string, self.signature):
 			self.name = hashlib.md5(self.publickey.exportKey()).hexdigest()
@@ -56,16 +57,16 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 				self.freespace = data[3]
 				self.factory.storage_nodes[self.name] = self
 				print 'Storage Node %s connected at %s:%s' % (self.name, self.ip, self.port)
-				self.transport.write("Confirmed Registration\n")
+				self.transport.write(self.encode(("PRINT", "Confirmed Registration")) + "\n")
 			else:
 				self.type = 'CLIENT'
 				self.state = 'CONNECTED'
 				self.redundancy = data[1]
 				self.factory.clients[self.name] = self
 				print 'Client Node %s connected' % (self.name)
-				self.transport.write("Confirmed Registration\n")
+				self.transport.write(self.encode(('REG_CONFIRM',)) + "\n")
 		else:
-			self.transport.write("Public Key not verified!\n")
+			self.transport.write(self.encode(("ERROR", "Public Key not verified!\n")))
 	
 	def parse_message(self, line):
 		data = pickle.loads(base64.b64decode(line))
@@ -76,7 +77,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 		return data
 	
 	def handle_CLIENT(self, msg):
-		for x in msg:
 		self.detail_string, self.signature = msg
 		if self.publickey.verify(hashlib.sha256(self.detail_string).hexdigest(), self.signature):
 			data = pickle.loads(base64.b64decode(self.detail_string))
@@ -100,13 +100,12 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 							found += 1
 						y += 1
 				first_snode = self.factory.files[x[0]]['snodes']['list'][0]
-				self.factory.storage_nodes[first_snode].transport.write("NEWFILE\n")
 				global rsa_key
-				self.factory.storage_nodes[first_snode].transport.write(base64.b64encode(pickle.dumps((x[0],x[1],self.publickey, '%s' % rsa_key.publickey().exportKey()))) + "\n")
+				self.factory.storage_nodes[first_snode].transport.write(self.encode(("NEWFILE", x[0],x[1],self.publickey, '%s' % rsa_key.publickey().exportKey())) + "\n")
 				init_ip = self.factory.storage_nodes[first_snode].ip
 				init_port = self.factory.storage_nodes[first_snode].port
 				filename = x[0]
-				self.transport.write(base64.b64encode(pickle.dumps((init_ip, init_port, filename))) + '\n')
+				self.transport.write(self.encode(("STORAGE_DETAILS", base64.b64encode(pickle.dumps((init_ip, init_port, filename))))) + '\n')
 		else:
 			self.transport.write("Error! Public key not verified!\n")
 	
