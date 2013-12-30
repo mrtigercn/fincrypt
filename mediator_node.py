@@ -1,6 +1,6 @@
 import os, ConfigParser, time
 
-from twisted.internet import reactor, protocol, defer
+from twisted.internet import reactor, protocol, defer, task
 from twisted.protocols import basic
 
 from common import COMMANDS, display_message, validate_file_md5_hash, get_file_md5_hash, read_bytes_from_file, clean_and_split_input
@@ -125,6 +125,14 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		self.storage_nodes = {}
 		self.files = {}
 		self.deferred = defer.Deferred()
+		self.defer_verification = task.deferLater(reactor, 10.0, self.init_verification)
+	
+	def init_verification(self):
+		self.l = task.LoopingCall(self.handle_file_verification)
+		self.l.start(600.0)
+	
+	def handle_file_verification(self):
+		print 'Hello!'
 	
 	def request_client_challenge(self, filename):
 		# do work here
@@ -132,6 +140,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 	
 	def request_storage_verify(self, filename, nonce, challenge):
 		for x in self.files[filename]['snodes']['list']:
+			# Need to also check if storage node is still connected
 			self.storage_nodes[x].write(self.encode(("VERIFY", filename, nonce)) + '\n')
 		return result
 	
