@@ -5,7 +5,7 @@ from urllib2 import urlopen
 from twisted.internet import reactor, protocol
 from twisted.protocols import basic
 
-from common import COMMANDS, display_message, validate_file_md5_hash, get_file_md5_hash, read_bytes_from_file, clean_and_split_input
+from common import COMMANDS, display_message, validate_file_md5_hash, get_file_md5_hash, read_bytes_from_file, clean_and_split_input, get_file_sha256_hash
 
 import pickle, base64
 
@@ -122,7 +122,7 @@ class FileTransferProtocol(basic.LineReceiver):
 				
 					display_message('File %s has been successfully transfered' % (filename))
 					
-					self.factory.message_siblings(new_files[filename][2], 'FILESENT' + filename)
+					self.factory.message_siblings(new_files[filename][2], ('FILESENT', filename))
 					
 					del new_files[filename]
 					
@@ -245,8 +245,8 @@ class StorageNodeMediatorClientFactory(protocol.ClientFactory):
 		self.mediators = {}
 	
 	def get_message(self, name, message):
-		if message[0:8] == 'FILESENT':
-			self.mediators[''.join(name.splitlines())].transport.write(base64.b64encode(pickle.dumps((message[0:8], message[8:]))) + '\n')
+		if message[0] == 'FILESENT':
+			self.mediators[''.join(name.splitlines())].transport.write(base64.b64encode(pickle.dumps((message[0], message[1], get_file_sha256_hash(self.configpath + '/' + message[1])))) + '\n')
 
 def freespace(folder):
 	s = os.statvfs(folder)

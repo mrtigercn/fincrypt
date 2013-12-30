@@ -1,4 +1,4 @@
-import os, ConfigParser
+import os, ConfigParser, time
 
 from twisted.internet import reactor, protocol, defer
 from twisted.protocols import basic
@@ -15,7 +15,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	def connectionMade(self):
 		self.setLineMode()
 		print "Client Connected"
-		self.transport.write(self.encode(("REGISTER",)) + "\n")
+		self.transport.write(self.factory.encode(("REGISTER",)) + "\n")
 	
 	def connectionLost(self, reason):
 		if self.type == 'CLIENT':
@@ -28,23 +28,30 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			print "Unregistered Connection Dropped"
 	
 	def lineReceived(self, line):
-		message = self.parse_message(line)
+		message = self.factory.parse_message(line)
 		cmd, msg = message[0], message[1:]
 		print 'CMD:', cmd
 		if cmd == 'REGISTER':
 			self.handle_REGISTER(msg)
 		elif cmd == 'FILESENT':
-			print msg
+			self.handle_FILESENT(msg)
 		elif self.state == 'CONNECTED' and self.type == 'CLIENT':
 			self.handle_CLIENT(msg)
 		elif self.state == 'CONNECTED' and self.type == 'STORAGE':
 			self.handle_STORAGE(msg)
 	
+	def handle_FILESENT(self, msg):
+		filename, sha256_hash = msg
+		if self.factory.files[filename]['original_sha256'] == sha256_hash:
+			print filename, True
+		else:
+			print filename, False
+	
 	def handle_REGISTER(self, msg):
 		global rsa_key
 		key_export = ''.join(rsa_key.publickey().exportKey().splitlines())
-		self.transport.write(self.encode(("PRINT", "Registering...")) + "\n")
-		self.transport.write(self.encode(("MEDREG", key_export)) + '\n')
+		self.transport.write(self.factory.encode(("PRINT", "Registering...")) + "\n")
+		self.transport.write(self.factory.encode(("MEDREG", key_export)) + '\n')
 		self.publickey, self.detail_string, self.signature = msg
 		if self.publickey.verify(self.detail_string, self.signature):
 			self.name = hashlib.md5(self.publickey.exportKey()).hexdigest()
@@ -57,24 +64,16 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 				self.freespace = data[3]
 				self.factory.storage_nodes[self.name] = self
 				print 'Storage Node %s connected at %s:%s' % (self.name, self.ip, self.port)
-				self.transport.write(self.encode(("PRINT", "Confirmed Registration")) + "\n")
+				self.transport.write(self.factory.encode(("PRINT", "Confirmed Registration")) + "\n")
 			else:
 				self.type = 'CLIENT'
 				self.state = 'CONNECTED'
 				self.redundancy = data[1]
 				self.factory.clients[self.name] = self
 				print 'Client Node %s connected' % (self.name)
-				self.transport.write(self.encode(('REG_CONFIRM',)) + "\n")
+				self.transport.write(self.factory.encode(('REG_CONFIRM',)) + "\n")
 		else:
-			self.transport.write(self.encode(("ERROR", "Public Key not verified!\n")))
-	
-	def parse_message(self, line):
-		data = pickle.loads(base64.b64decode(line))
-		return data
-	
-	def encode(self, msg):
-		data = base64.b64encode(pickle.dumps(msg))
-		return data
+			self.transport.write(self.factory.encode(("ERROR", "Public Key not verified!\n")))
 	
 	def handle_CLIENT(self, msg):
 		self.detail_string, self.signature = msg
@@ -85,6 +84,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 					self.factory.files[x[0]] = {}
 					self.factory.files[x[0]]['size'] = x[1]
 					self.factory.files[x[0]]['current_nonce'] = ''
+					self.factory.files[x[0]]['original_sha256'] = x[2]
 					self.factory.files[x[0]]['current_sha256'] = x[2]
 					self.factory.files[x[0]]['snodes'] = {}
 					self.factory.files[x[0]]['snodes']['list'] = []
@@ -94,18 +94,20 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 					y = 0
 					while found < self.redundancy:
 						if self.factory.storage_nodes[snodes[y][0]].freespace >= x[1]:
-							self.factory.storage_nodes[snodes[y][0]].state = 'REGISTER'
 							self.factory.files[x[0]]['snodes'][snodes[y][0]] = {}
+							self.factory.files[x[0]]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
+							self.factory.files[x[0]]['snodes'][snodes[y][0]]['last_checked'] = time.time()
+							self.factory.files[x[0]]['snodes'][snodes[y][0]]['history'] = (0,0)
 							self.factory.files[x[0]]['snodes']['list'].append(snodes[y][0])
 							found += 1
 						y += 1
 				first_snode = self.factory.files[x[0]]['snodes']['list'][0]
 				global rsa_key
-				self.factory.storage_nodes[first_snode].transport.write(self.encode(("NEWFILE", x[0],x[1],self.publickey, '%s' % rsa_key.publickey().exportKey())) + "\n")
+				self.factory.storage_nodes[first_snode].transport.write(self.factory.encode(("NEWFILE", x[0],x[1],self.publickey, '%s' % rsa_key.publickey().exportKey())) + "\n")
 				init_ip = self.factory.storage_nodes[first_snode].ip
 				init_port = self.factory.storage_nodes[first_snode].port
 				filename = x[0]
-				self.transport.write(self.encode(("STORAGE_DETAILS", base64.b64encode(pickle.dumps((init_ip, init_port, filename))))) + '\n')
+				self.transport.write(self.factory.encode(("STORAGE_DETAILS", base64.b64encode(pickle.dumps((init_ip, init_port, filename))))) + '\n')
 		else:
 			self.transport.write("Error! Public key not verified!\n")
 	
@@ -123,6 +125,23 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		self.storage_nodes = {}
 		self.files = {}
 		self.deferred = defer.Deferred()
+	
+	def request_client_challenge(self, filename):
+		# do work here
+		return nonce, challenge
+	
+	def request_storage_verify(self, filename, nonce, challenge):
+		for x in self.files[filename]['snodes']['list']:
+			self.storage_nodes[x].write(self.encode(("VERIFY", filename, nonce)) + '\n')
+		return result
+	
+	def parse_message(self, line):
+		data = pickle.loads(base64.b64decode(line))
+		return data
+	
+	def encode(self, msg):
+		data = base64.b64encode(pickle.dumps(msg))
+		return data
 
 def get_rsa_key(config):
 	try:

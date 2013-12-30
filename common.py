@@ -47,14 +47,16 @@ def read_bytes_from_file(file, chunk_size = 8100):
             else:
                 break
 
-def validate_file_sha256_hash(file, original_hash):
-	if get_file_sha256_hash(file) == original_hash:
+def validate_file_sha256_hash(file, original_hash, nonce=''):
+	if get_file_sha256_hash(file, nonce=nonce) == original_hash:
 		return True
 	
 	return False
 
-def get_file_sha256_hash(file):
+def get_file_sha256_hash(file, nonce=''):
 	sha256 = hashlib.sha256()
+	
+	sha256.update(nonce)
 	
 	for bytes in read_bytes_from_file(file):
 		sha256.update(bytes)
