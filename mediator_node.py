@@ -35,17 +35,47 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.handle_REGISTER(msg)
 		elif cmd == 'FILESENT':
 			self.handle_FILESENT(msg)
+		elif cmd == 'NEWVERIFYHASH' and self.type == 'CLIENT':
+			self.handle_NEWVERIFYHASH(msg)
+		elif cmd == 'VERIFY' and self.type == 'STORAGE':
+			self.handle_STORAGE_VERIFY(msg)
 		elif self.state == 'CONNECTED' and self.type == 'CLIENT':
 			self.handle_CLIENT(msg)
 		elif self.state == 'CONNECTED' and self.type == 'STORAGE':
 			self.handle_STORAGE(msg)
 	
+	def handle_STORAGE_VERIFY(self, msg):
+		filename, sha256hash = msg
+		history = self.factory.files[filename]['snodes'][self.name]['history']
+		time_spent = time.time() - self.factory.files[filename]['snodes'][self.name]['last_checked']
+		self.factory.files[filename]['snodes'][self.name]['last_checked'] = time.time()
+		if self.factory.files[filename]['current_sha256'] == sha256hash:
+			# Once a payment marketplace is set up, you'll send money to the Storage Node at this point
+			self.factory.files[filename]['snodes'][self.name]['history'] = history[0] + 1, history[1] + 1
+			self.factory.files[filename]['snodes'][self.name]['status'] = 'VERIFIED'
+		else:
+			self.factory.files[filename]['snodes'][self.name]['history'] = history[0], history[1] + 1
+			self.factory.files[filename]['snodes'][self.name]['status'] = 'DISABLED'
+			self.factory.add_node_to_file(filename)
+	
+	def handle_NEWVERIFYHASH(self, msg):
+		detail_string, signature = msg
+		if self.publickey.verify(hashlib.sha256(detail_string).hexdigest(), signature):
+			filename, nonce, sha256hash = self.factory.parse_message(detail_string)
+			self.factory.files[filename]['current_nonce'] = nonce
+			self.factory.files[filename]['current_sha256'] = sha256hash
+			self.factory.request_storage_verify(filename, nonce)
+	
 	def handle_FILESENT(self, msg):
 		filename, sha256_hash = msg
+		history = self.factory.files[filename]['snodes'][self.name]['history']
 		if self.factory.files[filename]['original_sha256'] == sha256_hash:
 			print filename, True
+			self.factory.files[filename]['snodes'][self.name]['history'] = history[0] + 1, history[1] + 1
+			self.factory.files[filename]['snodes'][self.name]['status'] = 'VERIFIED'
 		else:
 			print filename, False
+			self.factory.files[filename]['snodes'][self.name]['history'] = history[0], history[1] + 1
 	
 	def handle_REGISTER(self, msg):
 		global rsa_key
@@ -76,18 +106,15 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.transport.write(self.factory.encode(("ERROR", "Public Key not verified!\n")))
 	
 	def handle_CLIENT(self, msg):
-		self.detail_string, self.signature = msg
-		if self.publickey.verify(hashlib.sha256(self.detail_string).hexdigest(), self.signature):
-			data = pickle.loads(base64.b64decode(self.detail_string))
+		detail_string, signature = msg
+		if self.publickey.verify(hashlib.sha256(detail_string).hexdigest(), signature):
+			data = pickle.loads(base64.b64decode(detail_string))
 			for x in data:
 				if x[0] not in self.factory.files:
 					self.factory.files[x[0]] = {}
-					self.factory.files[x[0]]['size'] = x[1]
-					self.factory.files[x[0]]['current_nonce'] = ''
-					self.factory.files[x[0]]['original_sha256'] = x[2]
-					self.factory.files[x[0]]['current_sha256'] = x[2]
 					self.factory.files[x[0]]['snodes'] = {}
 					self.factory.files[x[0]]['snodes']['list'] = []
+					self.factory.files[x[0]]['client'] = self.name
 					snodes = self.factory.storage_nodes.items()
 					random.shuffle(snodes)
 					found = 0
@@ -101,13 +128,20 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 							self.factory.files[x[0]]['snodes']['list'].append(snodes[y][0])
 							found += 1
 						y += 1
+				elif x[0] in self.factory.files and self.factory.files[x[0]]['original_sha256'] == x[2]:
+					self.transport.write(self.factory.encode(("PRINT", "File '%s' Up to Date" % x[0])) + '\n')
+					continue
+				self.factory.files[x[0]]['size'] = x[1]
+				self.factory.files[x[0]]['current_nonce'] = ''
+				self.factory.files[x[0]]['original_sha256'] = x[2]
+				self.factory.files[x[0]]['current_sha256'] = x[2]
 				first_snode = self.factory.files[x[0]]['snodes']['list'][0]
 				global rsa_key
 				self.factory.storage_nodes[first_snode].transport.write(self.factory.encode(("NEWFILE", x[0],x[1],self.publickey, '%s' % rsa_key.publickey().exportKey())) + "\n")
 				init_ip = self.factory.storage_nodes[first_snode].ip
 				init_port = self.factory.storage_nodes[first_snode].port
 				filename = x[0]
-				self.transport.write(self.factory.encode(("STORAGE_DETAILS", base64.b64encode(pickle.dumps((init_ip, init_port, filename))))) + '\n')
+				self.transport.write(self.factory.encode(("STORAGE_DETAILS", base64.b64encode(pickle.dumps((init_ip, init_port, filename, self.factory.files[x[0]]['snodes']['list']))))) + '\n')
 		else:
 			self.transport.write("Error! Public key not verified!\n")
 	
@@ -129,20 +163,33 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 	
 	def init_verification(self):
 		self.l = task.LoopingCall(self.handle_file_verification)
-		self.l.start(600.0)
+		self.l.start(60.0)
 	
 	def handle_file_verification(self):
-		print 'Hello!'
+		for x in self.files:
+			if self.files[x]['client'] in self.clients:
+				self.request_client_challenge(x)
 	
 	def request_client_challenge(self, filename):
 		# do work here
-		return nonce, challenge
+		client = self.files[filename]['client']
+		if client in self.clients:
+			nonce = os.urandom(32)
+			self.clients[client].transport.write(self.encode(("NEWVERIFYHASH", filename, nonce)) + '\n')
 	
-	def request_storage_verify(self, filename, nonce, challenge):
+	def request_storage_verify(self, filename, nonce):
 		for x in self.files[filename]['snodes']['list']:
-			# Need to also check if storage node is still connected
-			self.storage_nodes[x].write(self.encode(("VERIFY", filename, nonce)) + '\n')
-		return result
+			if x in self.storage_nodes:
+				self.storage_nodes[x].transport.write(self.encode(("VERIFY", filename, nonce)) + '\n')
+			else:
+				self.files[filename]['snodes'][x]['status'] = 'DISABLED'
+				history = self.files[filename]['snodes'][x]['history']
+				self.files[filename]['snodes'][x]['history'] = history[0], history[1] + 1
+				self.add_node_to_file(filename)
+		
+	def add_node_to_file(self, filename):
+		# do work here
+		return new_node
 	
 	def parse_message(self, line):
 		data = pickle.loads(base64.b64decode(line))

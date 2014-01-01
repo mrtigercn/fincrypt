@@ -205,8 +205,17 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 		elif cmd == 'REGISTER':
 			register_details = self.mediator_details()
 			self.transport.write(register_details + '\n')
+		elif cmd == 'VERIFY':
+			self.handle_VERIFY(msg)
 		elif cmd == 'PRINT':
 			print 'msg:', msg
+		else:
+			print cmd, msg
+	
+	def handle_VERIFY(self, msg):
+		filename, nonce = msg
+		sha256hash = get_file_sha256_hash(self.factory.configpath + '/' + filename, nonce=nonce)
+		self.transport.write(self.encode(("VERIFY", filename, sha256hash)) + '\n')
 	
 	def parse_message(self, line):
 		data = pickle.loads(base64.b64decode(line))

@@ -17,15 +17,15 @@ from Crypto.PublicKey import RSA
 class FileTransferProtocol(basic.LineReceiver):
 	delimiter = '\n'
 	
-	def maybeDisconnect(self):
-		global file_count
-		file_count -= 1
-		if 0 == file_count:
-			self.transport.loseConnection()
+	#def maybeDisconnect(self):
+	#	global file_count
+	#	file_count -= 1
+	#	if 0 == file_count:
+	#		self.transport.loseConnection()
 	
 	def _get_file(self, filename):
 		self.transport.write('%s %s\n' % ('get', filename))
-		self.maybeDisconnect()
+		#self.maybeDisconnect()
 	
 	def _send_file(self, file_path, filename):
 		file_path = file_path + '/' + filename
@@ -50,7 +50,6 @@ class FileTransferProtocol(basic.LineReceiver):
 		
 		# When the transfer is finished, we go back to the line mode 
 		self.setLineMode()
-		self.maybeDisconnect()
 	
 	def connectionMade(self):
 		self.buffer = []
@@ -73,7 +72,7 @@ class FileTransferProtocol(basic.LineReceiver):
 	
 	def lineReceived(self, line):
 		if line == 'ENDMSG':
-			self.factory.deferred.callback(self.buffer)
+			#self.factory.deferred.callback(self.buffer)
 			self.buffer = []
 		if line.startswith('HASH'):
 			# Received a file name and hash, server is sending us a file
@@ -200,8 +199,17 @@ class MediatorClientProtocol(basic.LineReceiver):
 		elif cmd == 'STORAGE_DETAILS':
 			data = pickle.loads(base64.b64decode(msg[0]))
 			reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', self.factory.clientdir + '/tmp~', data[2]))
+		elif cmd == 'NEWVERIFYHASH':
+			self.new_verify_hash(msg)
 		else:
 			print msg
+	
+	def new_verify_hash(self, msg):
+		filename, nonce = msg
+		sha256hash = get_file_sha256_hash(self.factory.clientdir + '/tmp~/' + filename, nonce=nonce)
+		detail_string = base64.b64encode(pickle.dumps((filename, nonce, sha256hash)))
+		signature = self.factory.rsa_key.sign(hashlib.sha256(detail_string).hexdigest(), "")
+		self.transport.write(self.encode(("NEWVERIFYHASH", detail_string, signature)) + '\n')
 	
 	def parse_message(self, line):
 		data = pickle.loads(base64.b64decode(line))
@@ -250,7 +258,6 @@ if __name__ == '__main__':
 	else:
 		parse_dir_changes(clientdir, gdc, enc_pwd, key)
 	tmp_files = parse_tmp_dir(clientdir)
-	file_count = len(tmp_files)
 	defer.setDebugging(True)
 	config.write(open('client.cfg', 'wb'))
 	reactor.connectTCP('localhost', 8001, MediatorClientFactory(clientdir, rsa_key, tmp_files, 1))
