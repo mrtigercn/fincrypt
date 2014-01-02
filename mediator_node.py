@@ -73,6 +73,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			print filename, True
 			self.factory.files[filename]['snodes'][self.name]['history'] = history[0] + 1, history[1] + 1
 			self.factory.files[filename]['snodes'][self.name]['status'] = 'VERIFIED'
+			self.factory.propogate_file_to_nodes(filename, self.name)
 		else:
 			print filename, False
 			self.factory.files[filename]['snodes'][self.name]['history'] = history[0], history[1] + 1
@@ -119,7 +120,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 					random.shuffle(snodes)
 					found = 0
 					y = 0
-					while found < self.redundancy:
+					while found < self.redundancy and y < len(self.factory.storage_nodes):
 						if self.factory.storage_nodes[snodes[y][0]].freespace >= x[1]:
 							self.factory.files[x[0]]['snodes'][snodes[y][0]] = {}
 							self.factory.files[x[0]]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
@@ -186,7 +187,18 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 				history = self.files[filename]['snodes'][x]['history']
 				self.files[filename]['snodes'][x]['history'] = history[0], history[1] + 1
 				self.add_node_to_file(filename)
-		
+	
+	def propogate_file_to_nodes(self, filename, snode):
+		ip, port = self.storage_nodes[snode].ip, self.storage_nodes[snode].port
+		for x in self.files[filename]['snodes']['list']:
+			if x in self.storage_nodes and x is not snode:
+				self.storage_nodes[x].transport.write(self.encode(("REQUESTFILE", filename, ip, port)) + '\n')
+			else:
+				self.files[filename]['snodes'][x]['status'] = 'DISABLED'
+				history = self.files[filename]['snodes'][x]['history']
+				self.files[filename]['snodes'][x]['history'] = history[0], history[1] + 1
+				self.add_node_to_file(filename)
+	
 	def add_node_to_file(self, filename):
 		# do work here
 		return new_node

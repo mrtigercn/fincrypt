@@ -7,6 +7,8 @@ from twisted.protocols import basic
 
 from common import COMMANDS, display_message, validate_file_md5_hash, get_file_md5_hash, read_bytes_from_file, clean_and_split_input, get_file_sha256_hash
 
+import client_node
+
 import pickle, base64
 
 from Crypto.PublicKey import RSA
@@ -207,10 +209,16 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 			self.transport.write(register_details + '\n')
 		elif cmd == 'VERIFY':
 			self.handle_VERIFY(msg)
+		elif cmd == 'REQUESTFILE':
+			self.handle_REQUESTFILE(msg)
 		elif cmd == 'PRINT':
 			print 'msg:', msg
 		else:
 			print cmd, msg
+	
+	def handle_REQUESTFILE(self, msg):
+		filename, ip, port = msg
+		reactor.connectTCP(ip, port, client_node.FileTransferClientFactory('get', self.factory.configpath, filename))
 	
 	def handle_VERIFY(self, msg):
 		filename, nonce = msg
