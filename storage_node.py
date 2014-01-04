@@ -266,9 +266,8 @@ class StorageNodeMediatorClientFactory(protocol.ClientFactory):
 			self.mediators[''.join(name.splitlines())].transport.write(base64.b64encode(pickle.dumps((message[0], message[1], get_file_sha256_hash(self.configpath + '/' + message[1])))) + '\n')
 
 def ensure_dir(f):
-	d = os.path.dirname(f)
-	if not os.path.exists(d):
-		os.makedirs(d)
+	if not os.path.exists(f):
+		os.makedirs(f)
 
 def freespace(folder):
 	ensure_dir(folder)
