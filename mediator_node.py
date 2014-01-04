@@ -221,7 +221,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		random.shuffle(snodes)
 		y = 0
 		end = False
-		while end == False and y < len(self.storage_nodes) and count < self.clients[self.files[filename].client].redundancy:
+		while end == False and y < len(self.storage_nodes) and count < self.clients[self.files[filename]['client']].redundancy:
 			if self.storage_nodes[snodes[y][0]].freespace >= self.files[filename]['size']:
 				self.files[filename]['snodes'][snodes[y][0]] = {}
 				self.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
