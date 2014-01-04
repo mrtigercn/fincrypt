@@ -103,7 +103,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 				self.port = data[2]
 				self.freespace = data[3]
 				self.factory.storage_nodes[self.name] = self
-				print self.factory.storage_nodes
 				print 'Storage Node %s connected at %s:%s' % (self.name, self.ip, self.port)
 				self.transport.write(self.factory.encode(("PRINT", "Confirmed Registration")) + "\n")
 			else:
@@ -201,10 +200,9 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 	def propogate_file_to_nodes(self, filename, snode):
 		ip, port = self.storage_nodes[snode].ip, self.storage_nodes[snode].port
 		for x in self.files[filename]['snodes']['list']:
-			if x in self.storage_nodes and x != snode:
-				print x, snode
-				print x == snode
-				self.storage_nodes[x].transport.write(self.encode(("REQUESTFILE", filename, ip, port)) + '\n')
+			if x in self.storage_nodes:
+				if x != snode:
+					self.storage_nodes[x].transport.write(self.encode(("REQUESTFILE", filename, ip, port)) + '\n')
 			else:
 				self.files[filename]['snodes'][x]['status'] = 'DISABLED'
 				history = self.files[filename]['snodes'][x]['history']
