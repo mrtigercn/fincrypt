@@ -142,7 +142,7 @@ def parse_dir_changes(directory, changes, pwd, key):
 		if file[-1] == '~' or file[0:4] == 'tmp~':
 			continue
 		else:
-			encrypt_file(key, directory + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + root + file).hexdigest())
+			encrypt_file(key, directory + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + directory + '/' + file).hexdigest())
 
 def parse_new_dir(directory, pwd, key):
 	if not os.path.exists(directory + '/tmp~'):
