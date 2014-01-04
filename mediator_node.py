@@ -129,7 +129,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 					random.shuffle(snodes)
 					found = 0
 					y = 0
-					while found < self.redundancy and y < len(self.factory.storage_nodes):
+					while found < 1 and y < len(self.factory.storage_nodes):
 						if self.factory.storage_nodes[snodes[y][0]].freespace >= x[1]:
 							self.factory.files[x[0]]['snodes'][snodes[y][0]] = {}
 							self.factory.files[x[0]]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
@@ -188,6 +188,9 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 			self.clients[client].transport.write(self.encode(("NEWVERIFYHASH", filename, nonce)) + '\n')
 	
 	def request_storage_verify(self, filename, nonce):
+		print self.files[filename]['snodes']['list']
+		print '\n'
+		print self.storage_nodes
 		for x in self.files[filename]['snodes']['list']:
 			if x in self.storage_nodes:
 				self.storage_nodes[x].transport.write(self.encode(("VERIFY", filename, nonce)) + '\n')
