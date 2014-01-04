@@ -219,7 +219,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		end = False
 		while end == False and y < len(self.storage_nodes):
 			if self.storage_nodes[snodes[y][0]].freespace >= self.files[filename]['size']:
-				selffiles[filename]['snodes'][snodes[y][0]] = {}
+				self.files[filename]['snodes'][snodes[y][0]] = {}
 				self.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
 				self.files[filename]['snodes'][snodes[y][0]]['last_checked'] = time.time()
 				self.files[filename]['snodes'][snodes[y][0]]['history'] = (0,0)
