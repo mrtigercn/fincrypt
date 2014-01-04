@@ -86,6 +86,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 		else:
 			print filename, False
 			self.factory.files[filename]['snodes'][self.name]['history'] = history[0], history[1] + 1
+			self.factory.add_node_to_file(filename)
 	
 	def handle_REGISTER(self, msg):
 		global rsa_key
@@ -211,10 +212,15 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 	
 	def add_node_to_file(self, filename):
 		snodes = self.storage_nodes.items()
+		count = 0
+		current_nodes = self.files[filename]['snodes']
+		for x in current_nodes:
+			if self.files[filename]['snodes'][x] != 'DISABLED':
+				count += 1
 		random.shuffle(snodes)
 		y = 0
 		end = False
-		while end == False and y < len(self.storage_nodes):
+		while end == False and y < len(self.storage_nodes) and count < self.clients[self.files[filename].client].redundancy:
 			if self.storage_nodes[snodes[y][0]].freespace >= self.files[filename]['size']:
 				self.files[filename]['snodes'][snodes[y][0]] = {}
 				self.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
