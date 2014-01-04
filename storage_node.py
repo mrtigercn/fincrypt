@@ -282,7 +282,7 @@ def get_rsa_key(config):
 		rsa_file = open(rsa_key_file, 'r')
 		rsa_key = RSA.importKey(rsa_file.read())
 		rsa_file.close()
-	except ConfigParser.NoOptionError, IOError:
+	except (ConfigParser.NoOptionError, IOError) as e:
 		rsa_key_file = 'storage.key'
 		config.set('storage', 'rsa_file', rsa_key_file)
 		rsa_key = RSA.generate(4096)
