@@ -201,7 +201,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 	def propogate_file_to_nodes(self, filename, snode):
 		ip, port = self.storage_nodes[snode].ip, self.storage_nodes[snode].port
 		for x in self.files[filename]['snodes']['list']:
-			if x in self.storage_nodes and x is not snode:
+			if x in self.storage_nodes and x != snode:
 				print x, snode
 				print x == snode
 				self.storage_nodes[x].transport.write(self.encode(("REQUESTFILE", filename, ip, port)) + '\n')
