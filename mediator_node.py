@@ -214,14 +214,14 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		y = 0
 		end = False
 		while end == False:
-		if self.factory.storage_nodes[snodes[y][0]].freespace >= self.files[filename]['size']:
-			self.factory.files[filename]['snodes'][snodes[y][0]] = {}
-			self.factory.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
-			self.factory.files[filename]['snodes'][snodes[y][0]]['last_checked'] = time.time()
-			self.factory.files[filename]['snodes'][snodes[y][0]]['history'] = (0,0)
-			self.factory.files[filename]['snodes']['list'].append(snodes[y][0])
-			end = True
-		y += 1
+			if self.factory.storage_nodes[snodes[y][0]].freespace >= self.files[filename]['size']:
+				self.factory.files[filename]['snodes'][snodes[y][0]] = {}
+				self.factory.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
+				self.factory.files[filename]['snodes'][snodes[y][0]]['last_checked'] = time.time()
+				self.factory.files[filename]['snodes'][snodes[y][0]]['history'] = (0,0)
+				self.factory.files[filename]['snodes']['list'].append(snodes[y][0])
+				end = True
+			y += 1
 	
 	def parse_message(self, line):
 		data = pickle.loads(base64.b64decode(line))
