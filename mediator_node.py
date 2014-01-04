@@ -148,7 +148,8 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 				self.factory.files[x[0]]['original_sha256'] = x[2]
 				self.factory.files[x[0]]['current_sha256'] = x[2]
 				for snode in self.factory.files[x[0]]['snodes']:
-					print snode
+					if snode == 'list':
+						continue
 					self.factory.files[x[0]]['snodes'][snode]['status'] = 'UNVERIFIED'
 				first_snode = self.factory.files[x[0]]['snodes']['list'][0]
 				global rsa_key
