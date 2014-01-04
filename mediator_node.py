@@ -216,7 +216,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 	def add_node_to_file(self, filename):
 		snodes = self.storage_nodes.items()
 		count = 0
-		current_nodes = self.files[filename]['snodes']
+		current_nodes = dict(self.files[filename]['snodes'])
 		del current_nodes['list']
 		for x in current_nodes:
 			if self.files[filename]['snodes'][x] != 'DISABLED':
