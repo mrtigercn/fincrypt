@@ -220,6 +220,8 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		for x in current_nodes:
 			if self.files[filename]['snodes'][x] != 'DISABLED':
 				count += 1
+		print 'count:', count
+		print 'redundancy:', self.clients[self.files[filename]['client']].redundancy
 		random.shuffle(snodes)
 		y = 0
 		while y < len(self.storage_nodes) and count < self.clients[self.files[filename]['client']].redundancy:
