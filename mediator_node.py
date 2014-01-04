@@ -37,12 +37,21 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.handle_FILESENT(msg)
 		elif cmd == 'NEWVERIFYHASH' and self.type == 'CLIENT':
 			self.handle_NEWVERIFYHASH(msg)
+		elif cmd == 'RESOLVESTORAGENODE':
+			self.handle_RESOLVESTORAGENODE(msg)
 		elif cmd == 'VERIFY' and self.type == 'STORAGE':
 			self.handle_STORAGE_VERIFY(msg)
 		elif self.state == 'CONNECTED' and self.type == 'CLIENT':
 			self.handle_CLIENT(msg)
 		elif self.state == 'CONNECTED' and self.type == 'STORAGE':
 			self.handle_STORAGE(msg)
+	
+	def handle_RESOLVESTORAGENODE(self, msg):
+		snode = msg[0]
+		if snode in self.factory.storage_nodes:
+			self.transport.write(self.factory.encode(("NODEDETAILS", self.factory.storage_nodes[snode].ip, self.factory.storage_nodes[snode].port)) + '\n')
+		else:
+			self.transport.write(self.factory.encode(("NODEDETAILS", "NOT FOUND")) + '\n')
 	
 	def handle_STORAGE_VERIFY(self, msg):
 		filename, sha256hash = msg
@@ -217,7 +226,7 @@ def get_rsa_key(config):
 		rsa_file = open(rsa_key_file, 'r')
 		rsa_key = RSA.importKey(rsa_file.read())
 		rsa_file.close()
-	except ConfigParser.NoOptionError:
+	except ConfigParser.NoOptionError, IOError:
 		rsa_key_file = 'mediator.key'
 		config.set('mediator', 'rsa_file', rsa_key_file)
 		rsa_key = RSA.generate(4096)
