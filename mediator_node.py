@@ -203,7 +203,9 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		ip, port = self.storage_nodes[snode].ip, self.storage_nodes[snode].port
 		for x in self.files[filename]['snodes']['list']:
 			if x in self.storage_nodes:
+				print x, 'REQUEST', filename
 				if x != snode:
+					print True
 					self.storage_nodes[x].transport.write(self.encode(("REQUESTFILE", filename, ip, port)) + '\n')
 			else:
 				self.files[filename]['snodes'][x]['status'] = 'DISABLED'
