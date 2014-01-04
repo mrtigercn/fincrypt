@@ -103,6 +103,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 				self.port = data[2]
 				self.freespace = data[3]
 				self.factory.storage_nodes[self.name] = self
+				print self.factory.storage_nodes
 				print 'Storage Node %s connected at %s:%s' % (self.name, self.ip, self.port)
 				self.transport.write(self.factory.encode(("PRINT", "Confirmed Registration")) + "\n")
 			else:
@@ -216,7 +217,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		random.shuffle(snodes)
 		y = 0
 		end = False
-		while end == False:
+		while end == False and y < len(self.storage_nodes):
 			if self.storage_nodes[snodes[y][0]].freespace >= self.files[filename]['size']:
 				selffiles[filename]['snodes'][snodes[y][0]] = {}
 				self.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
