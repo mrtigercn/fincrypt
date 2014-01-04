@@ -209,17 +209,17 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 				self.add_node_to_file(filename)
 	
 	def add_node_to_file(self, filename):
-		snodes = self.factory.storage_nodes.items()
+		snodes = self.storage_nodes.items()
 		random.shuffle(snodes)
 		y = 0
 		end = False
 		while end == False:
-			if self.factory.storage_nodes[snodes[y][0]].freespace >= self.files[filename]['size']:
-				self.factory.files[filename]['snodes'][snodes[y][0]] = {}
-				self.factory.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
-				self.factory.files[filename]['snodes'][snodes[y][0]]['last_checked'] = time.time()
-				self.factory.files[filename]['snodes'][snodes[y][0]]['history'] = (0,0)
-				self.factory.files[filename]['snodes']['list'].append(snodes[y][0])
+			if self.storage_nodes[snodes[y][0]].freespace >= self.files[filename]['size']:
+				selffiles[filename]['snodes'][snodes[y][0]] = {}
+				self.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
+				self.files[filename]['snodes'][snodes[y][0]]['last_checked'] = time.time()
+				self.files[filename]['snodes'][snodes[y][0]]['history'] = (0,0)
+				self.files[filename]['snodes']['list'].append(snodes[y][0])
 				end = True
 			y += 1
 	
