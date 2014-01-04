@@ -1,4 +1,4 @@
-import os, ConfigParser, time
+import os, ConfigParser, time, sys
 
 from twisted.internet import reactor, protocol, defer, task
 from twisted.protocols import basic
@@ -236,8 +236,12 @@ def get_rsa_key(config):
 	return rsa_key
 
 if __name__ == '__main__':
+	try:
+		configfile = sys.argv[1]
+	except IndexError:
+		configfile = 'mediator.cfg'
 	config = ConfigParser.ConfigParser()
-	config.readfp(open('mediator.cfg'))
+	config.readfp(open(configfile))
 	configport = int(config.get('mediator', 'port'))
 	rsa_key = get_rsa_key(config)
 	config.write(open('mediator.cfg', 'wb'))

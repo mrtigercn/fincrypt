@@ -1,4 +1,4 @@
-import os, ConfigParser
+import os, ConfigParser, sys
 
 from twisted.internet import reactor, protocol, stdio, defer
 from twisted.protocols import basic
@@ -246,8 +246,12 @@ class MediatorClientFactory(protocol.ClientFactory):
 
 if __name__ == '__main__':
 	# What follows is a bunch of hardcoded stuff for use while building the system.
+	try:
+		configfile = sys.argv[1]
+	except IndexError:
+		configfile = 'client.cfg'
 	config = ConfigParser.ConfigParser()
-	config.readfp(open('client.cfg'))
+	config.readfp(open(configfile))
 	clientdir = config.get('client', 'path')
 	rsa_key = get_rsa_key(config)
 	enc_pwd = config.get('client', 'password')

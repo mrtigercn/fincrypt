@@ -1,4 +1,4 @@
-import os, ConfigParser
+import os, ConfigParser, sys
 import json
 from urllib2 import urlopen
 
@@ -312,8 +312,12 @@ class FactoryContainer(object):
 			self.servers[server].get_message(name, message)
 
 if __name__ == '__main__':
+	try:
+		configfile = sys.argv[1]
+	except IndexError:
+		configfile = 'storage.cfg'
 	config = ConfigParser.ConfigParser()
-	config.readfp(open('storage.cfg'))
+	config.readfp(open(configfile))
 	configport = int(config.get('storage', 'port'))
 	configpath = config.get('storage', 'path')
 	rsa_key = get_rsa_key(config)
