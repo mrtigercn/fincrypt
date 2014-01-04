@@ -232,7 +232,6 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 				self.files[filename]['snodes']['list'].append(snodes[y][0])
 				count += 1
 			y += 1
-		print self.files[filename]
 	
 	def parse_message(self, line):
 		data = pickle.loads(base64.b64decode(line))
