@@ -263,6 +263,6 @@ if __name__ == '__main__':
 		parse_dir_changes(clientdir, gdc, enc_pwd, key)
 	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
-	config.write(open('client.cfg', 'wb'))
+	config.write(open(configfile + '.cfg', 'wb'))
 	reactor.connectTCP('162.243.36.143', 8001, MediatorClientFactory(clientdir, rsa_key, tmp_files, 1))
 	reactor.run()

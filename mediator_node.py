@@ -256,7 +256,7 @@ if __name__ == '__main__':
 	config.readfp(open(configfile + '.cfg'))
 	configport = int(config.get('mediator', 'port'))
 	rsa_key = get_rsa_key(config)
-	config.write(open('mediator.cfg', 'wb'))
+	config.write(open(configfile + '.cfg', 'wb'))
 	
 	reactor.listenTCP(configport, FincryptMediatorFactory())
 	reactor.run()

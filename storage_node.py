@@ -326,7 +326,7 @@ if __name__ == '__main__':
 	configport = int(config.get('storage', 'port'))
 	configpath = config.get('storage', 'path')
 	rsa_key = get_rsa_key(config)
-	config.write(open('storage.cfg', 'wb'))
+	config.write(open(configfile + '.cfg', 'wb'))
 	
 	display_message('Listening on port %d, serving files from directory: %s' % (configport, configpath))
 	
