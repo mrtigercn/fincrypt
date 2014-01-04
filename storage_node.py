@@ -283,7 +283,7 @@ def get_rsa_key(config):
 		rsa_key = RSA.importKey(rsa_file.read())
 		rsa_file.close()
 	except (ConfigParser.NoOptionError, IOError) as e:
-		rsa_key_file = 'storage.key'
+		rsa_key_file = configfile + '.key'
 		config.set('storage', 'rsa_file', rsa_key_file)
 		rsa_key = RSA.generate(4096)
 		rsa_file = open(rsa_key_file, 'w')
@@ -315,9 +315,9 @@ if __name__ == '__main__':
 	try:
 		configfile = sys.argv[1]
 	except IndexError:
-		configfile = 'storage.cfg'
+		configfile = 'storage'
 	config = ConfigParser.ConfigParser()
-	config.readfp(open(configfile))
+	config.readfp(open(configfile + '.cfg'))
 	configport = int(config.get('storage', 'port'))
 	configpath = config.get('storage', 'path')
 	rsa_key = get_rsa_key(config)

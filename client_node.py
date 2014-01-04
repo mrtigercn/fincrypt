@@ -173,7 +173,7 @@ def get_rsa_key(config):
 		rsa_key = RSA.importKey(rsa_file.read())
 		rsa_file.close()
 	except (ConfigParser.NoOptionError, IOError) as e:
-		rsa_key_file = 'client.key'
+		rsa_key_file = configfile + '.key'
 		config.set('client', 'rsa_file', rsa_key_file)
 		rsa_key = RSA.generate(4096)
 		rsa_file = open(rsa_key_file, 'w')
@@ -249,9 +249,9 @@ if __name__ == '__main__':
 	try:
 		configfile = sys.argv[1]
 	except IndexError:
-		configfile = 'client.cfg'
+		configfile = 'client'
 	config = ConfigParser.ConfigParser()
-	config.readfp(open(configfile))
+	config.readfp(open(configfile + '.cfg'))
 	clientdir = config.get('client', 'path')
 	rsa_key = get_rsa_key(config)
 	enc_pwd = config.get('client', 'password')

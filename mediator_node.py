@@ -227,7 +227,7 @@ def get_rsa_key(config):
 		rsa_key = RSA.importKey(rsa_file.read())
 		rsa_file.close()
 	except (ConfigParser.NoOptionError, IOError) as e:
-		rsa_key_file = 'mediator.key'
+		rsa_key_file = configfile + '.key'
 		config.set('mediator', 'rsa_file', rsa_key_file)
 		rsa_key = RSA.generate(4096)
 		rsa_file = open(rsa_key_file, 'w')
@@ -239,9 +239,9 @@ if __name__ == '__main__':
 	try:
 		configfile = sys.argv[1]
 	except IndexError:
-		configfile = 'mediator.cfg'
+		configfile = 'mediator'
 	config = ConfigParser.ConfigParser()
-	config.readfp(open(configfile))
+	config.readfp(open(configfile + '.cfg'))
 	configport = int(config.get('mediator', 'port'))
 	rsa_key = get_rsa_key(config)
 	config.write(open('mediator.cfg', 'wb'))
