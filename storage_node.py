@@ -201,6 +201,7 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 	def lineReceived(self, line):
 		msg = self.parse_message(line)
 		cmd, msg = msg[0], msg[1:]
+		print cmd, msg
 		if cmd == 'NEWFILE':
 			self.handle_NEWFILE(msg)
 		elif cmd == 'MEDREG':
@@ -214,8 +215,6 @@ class StorageNodeMediatorClientProtocol(basic.LineReceiver):
 			self.handle_REQUESTFILE(msg)
 		elif cmd == 'PRINT':
 			print 'msg:', msg
-		else:
-			print cmd, msg
 	
 	def handle_REQUESTFILE(self, msg):
 		filename, ip, port = msg
