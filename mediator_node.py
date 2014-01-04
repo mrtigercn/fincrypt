@@ -217,6 +217,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		snodes = self.storage_nodes.items()
 		count = 0
 		current_nodes = self.files[filename]['snodes']
+		del current_nodes['list']
 		for x in current_nodes:
 			if self.files[filename]['snodes'][x] != 'DISABLED':
 				count += 1
