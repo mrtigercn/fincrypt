@@ -147,6 +147,8 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 				self.factory.files[x[0]]['current_nonce'] = ''
 				self.factory.files[x[0]]['original_sha256'] = x[2]
 				self.factory.files[x[0]]['current_sha256'] = x[2]
+				for snode in self.factory.files[x[0]]['snodes']:
+					self.factory.files[x[0]]['snodes'][snode]['status'] = 'UNVERIFIED'
 				first_snode = self.factory.files[x[0]]['snodes']['list'][0]
 				global rsa_key
 				self.factory.storage_nodes[first_snode].transport.write(self.factory.encode(("NEWFILE", x[0],x[1],self.publickey, '%s' % rsa_key.publickey().exportKey())) + "\n")
@@ -202,7 +204,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 	def propogate_file_to_nodes(self, filename, snode):
 		ip, port = self.storage_nodes[snode].ip, self.storage_nodes[snode].port
 		for x in self.files[filename]['snodes']['list']:
-			if x in self.storage_nodes:
+			if x in self.storage_nodes and self.files[filename]['snodes'][x]['status'] == 'UNVERIFIED':
 				print x, 'REQUEST', filename
 				if x != snode:
 					print True
@@ -232,6 +234,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 				self.files[filename]['snodes']['list'].append(snodes[y][0])
 				count += 1
 			y += 1
+		print self.files[filename]['snodes']['list']
 	
 	def parse_message(self, line):
 		data = pickle.loads(base64.b64decode(line))
