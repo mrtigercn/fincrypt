@@ -329,6 +329,6 @@ if __name__ == '__main__':
 	container.add_child(FileTransferServerFactory(configpath), 'ftpserver')
 	container.add_child(StorageNodeMediatorClientFactory(configpath, configport, rsa_key), 'mediator')
 	reactor.listenTCP(configport, container.servers['ftpserver'])
-	reactor.connectTCP('localhost', 8001, container.servers['mediator'])
+	reactor.connectTCP('162.243.36.143', 8001, container.servers['mediator'])
 	
 	reactor.run()
