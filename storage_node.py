@@ -66,7 +66,7 @@ class FileTransferProtocol(basic.LineReceiver):
 			
 			display_message('Sending file: %s (%d KB)' % (filename, self.factory.files[filename][1] / 1024))
 			
-			self.transport.write('HASH %s %s\n' % (filename, self.factory.files[filename][2]))
+			self.transport.write('HASH %s %s\n' % (filename, get_file_md5_hash(filename))
 			self.setRawMode()
 			
 			for bytes in read_bytes_from_file(os.path.join(self.factory.files_path, filename)):
