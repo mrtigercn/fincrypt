@@ -83,7 +83,7 @@ class FileTransferProtocol(basic.LineReceiver):
 				self.transport.write('Missing filename or file MD5 hash\n')
 				self.transport.write('ENDMSG\n')
 				return
-
+			
 			self.file_data = (filename, file_hash, signed_hash)
 			
 			# Switch to the raw mode (for receiving binary data)
