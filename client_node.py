@@ -66,8 +66,8 @@ class FileTransferProtocol(basic.LineReceiver):
 		self.file_data = ()
 		
 		print 'Connection to the server has been lost'
-		if reactor.running:
-			reactor.stop()
+		#if reactor.running:
+		#	reactor.stop()
 	
 	def lineReceived(self, line):
 		if line == 'ENDMSG':
