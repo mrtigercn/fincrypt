@@ -25,7 +25,6 @@ class FileTransferProtocol(basic.LineReceiver):
 	
 	def _get_file(self, filename):
 		self.transport.write('%s %s\n' % ('get', filename))
-		#self.maybeDisconnect()
 	
 	def _send_file(self, file_path, filename):
 		file_path = file_path + '/' + filename
@@ -103,6 +102,8 @@ class FileTransferProtocol(basic.LineReceiver):
 			
 			self.file_handler.close()
 			self.file_handler = None
+			
+			print self.file_data[1]
 			
 			if validate_file_md5_hash(file_path, self.file_data[1]):
 				print 'File %s has been successfully transfered and saved' % (filename)
