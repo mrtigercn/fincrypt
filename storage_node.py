@@ -104,8 +104,6 @@ class FileTransferProtocol(basic.LineReceiver):
 		file_path = os.path.join(self.factory.files_path, filename)
 		
 		display_message('Receiving file chunk (%d KB)' % (len(data)))
-			
-		print 'hash:', self.file_data[1]
 		
 		if not self.file_handler:
 			self.file_handler = open(file_path, 'wb')
