@@ -8,6 +8,8 @@ storagedir/
 storagedir*.json
 venv/
 
+*.wlt
+
 .env
 
 *.*~

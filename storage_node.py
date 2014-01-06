@@ -117,6 +117,8 @@ class FileTransferProtocol(basic.LineReceiver):
 			self.file_handler.close()
 			self.file_handler = None
 			
+			print self.file_data[1]
+			
 			if validate_file_md5_hash(file_path, self.file_data[1]):
 				print 'md5 Validate Passed for file: %s' % file_path
 				if filename in new_files and new_files[filename][0].verify(self.file_data[1],self.file_data[2]):

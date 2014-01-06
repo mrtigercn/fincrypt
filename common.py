@@ -35,7 +35,7 @@ def get_file_md5_hash(file):
         
     return md5_hash.hexdigest()
 
-def read_bytes_from_file(file, chunk_size = 8100):
+def read_bytes_from_file(file, chunk_size = 1048576):
     """ Read bytes from a file in chunks. """
     
     with open(file, 'rb') as file:

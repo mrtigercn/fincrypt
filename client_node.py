@@ -166,6 +166,26 @@ def parse_tmp_dir(directory):
 			tmp_files.append((root, file, os.stat(root + '/' + file).st_size, get_file_sha256_hash(root + '/' + file)))
 	return tmp_files
 
+def save_client_wallet(configfile, changes):
+	walletfile = configfile + '.wlt'
+	rsafile = configfile + '.key'
+	configfile = configfile + '.cfg'
+	
+	rsacontent = ''
+	configcontent = ''
+	
+	for bytes in read_bytes_from_file(rsafile):
+		rsacontent += base64.b64encode(bytes)
+		
+	for bytes in read_bytes_from_file(configfile):
+		configcontent += base64.b64encode(bytes)
+	
+	walletcfg = ConfigParser.ConfigParser()
+	walletcfg.add_section('settings')
+	walletcfg.set('settings', 'rsakey', rsacontent)
+	walletcfg.set('settings', 'config', configcontent)
+	walletcfg.write(open(walletfile, 'wb'))
+
 def get_rsa_key(config):
 	try:
 		rsa_key_file = config.get('client', 'rsa_file')
@@ -253,6 +273,8 @@ if __name__ == '__main__':
 	config = ConfigParser.ConfigParser()
 	config.readfp(open(configfile + '.cfg'))
 	clientdir = config.get('client', 'path')
+	med_ip = config.get('client', 'ip')
+	med_port = int(config.get('client', 'port'))
 	rsa_key = get_rsa_key(config)
 	enc_pwd = config.get('client', 'password')
 	key = hashlib.sha256(enc_pwd).digest()
@@ -261,8 +283,9 @@ if __name__ == '__main__':
 		parse_new_dir(clientdir, enc_pwd, key)
 	else:
 		parse_dir_changes(clientdir, gdc, enc_pwd, key)
+	save_client_wallet(configfile, gdc)
 	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
 	config.write(open(configfile + '.cfg', 'wb'))
-	reactor.connectTCP('162.243.36.143', 8001, MediatorClientFactory(clientdir, rsa_key, tmp_files, 2))
+	reactor.connectTCP(med_ip, med_port, MediatorClientFactory(clientdir, rsa_key, tmp_files, 2))
 	reactor.run()
