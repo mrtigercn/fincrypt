@@ -168,10 +168,28 @@ def parse_tmp_dir(directory):
 			tmp_files.append((root, file, os.stat(root + '/' + file).st_size, get_file_sha256_hash(root + '/' + file)))
 	return tmp_files
 
-def save_client_wallet(configfile, changes):
+def load_client_wallet(configfile):
+	walletfile = configfile + '.wlt'
+	
+	walletcfg = ConfigParser.ConfigParser()
+	
+	try:
+		walletcfg.readfp(open(walletfile))
+	except IOError:
+		return 'new'
+	
+	files = base64.b64decode(pickle.loads(walletcfg.get('settings', 'files'))
+	rsacontent = base64.b64decode(walletcfg.get('settings', 'rsakey'))
+	configcontent = base64.b64decode(walletcfg.get('settings', 'config'))
+	
+	return files, rsacontent, configcontent
+
+def save_client_wallet(configfile, files):
 	walletfile = configfile + '.wlt'
 	rsafile = configfile + '.key'
 	configfile = configfile + '.cfg'
+	
+	files = base64.b64encode(pickle.dumps(files))
 	
 	rsacontent = ''
 	configcontent = ''
@@ -186,6 +204,7 @@ def save_client_wallet(configfile, changes):
 	walletcfg.add_section('settings')
 	walletcfg.set('settings', 'rsakey', rsacontent)
 	walletcfg.set('settings', 'config', configcontent)
+	walletcfg.set('settings', 'files', files)
 	walletcfg.write(open(walletfile, 'wb'))
 
 def get_rsa_key(config):
@@ -273,7 +292,9 @@ if __name__ == '__main__':
 	except IndexError:
 		configfile = 'client'
 	config = ConfigParser.ConfigParser()
+	walletcfg = ConfigParser.ConfigParser()
 	config.readfp(open(configfile + '.cfg'))
+	walletcfg.readfp(open(configfile + '.wlt'))
 	clientdir = config.get('client', 'path')
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
