@@ -138,15 +138,21 @@ def get_dir_changes(directory):
 		return 'new'
 
 def parse_dir_changes(directory, changes, pwd, key):
+	file_dict = {}
 	if not os.path.exists(directory + '/tmp~'):
 		os.makedirs(directory + '/tmp~')
 	for file in changes['created'] + changes['updated']:
 		if file[-1] == '~' or file[0:4] == 'tmp~':
 			continue
 		else:
-			encrypt_file(key, directory + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + directory + '/' + file).hexdigest())
+			original_file = directory + '/' + file
+			new_file = hashlib.sha256(pwd + directory + '/' + file).hexdigest()
+			encrypt_file(key, original_file, directory + '/tmp~/' + new_file)
+			file_dict[new_file] = original_file
+		return file_dict
 
 def parse_new_dir(directory, pwd, key):
+	file_dict = {}
 	if not os.path.exists(directory + '/tmp~'):
 		os.makedirs(directory + '/tmp~')
 	d = Dir(directory)
@@ -155,7 +161,11 @@ def parse_new_dir(directory, pwd, key):
 			if file[-1] == '~' or root[-1] == '~':
 				continue
 			else:
-				encrypt_file(key, root + '/' + file, directory + '/tmp~/' + hashlib.sha256(pwd + root + file).hexdigest())
+				original_file = directory + '/' + file
+				new_file = hashlib.sha256(pwd + directory + '/' + file).hexdigest()
+				encrypt_file(key, original_file, directory + '/tmp~/' + new_file)
+				file_dict[new_file] = original_file
+			return file_dict
 
 def parse_tmp_dir(directory):
 	directory = directory + '/tmp~'
@@ -176,30 +186,24 @@ def load_client_wallet(configfile):
 	try:
 		walletcfg.readfp(open(walletfile))
 	except IOError:
-		return 'new'
+		return 'new', 'new', 'new'
 	
-	files = base64.b64decode(pickle.loads(walletcfg.get('settings', 'files'))
-	rsacontent = base64.b64decode(walletcfg.get('settings', 'rsakey'))
-	configcontent = base64.b64decode(walletcfg.get('settings', 'config'))
+	files = pickle.loads(base64.b64decode(walletcfg.get('settings', 'files')))
+	rsacontent = pickle.loads(base64.b64decode(walletcfg.get('settings', 'rsakey')))
+	configcontent = pickle.loads(base64.b64decode(walletcfg.get('settings', 'config')))
 	
-	return files, rsacontent, configcontent
+	return files, rsa_key, config
 
-def save_client_wallet(configfile, files):
+def save_client_wallet(configfile, config, rsa_key, file_dict):
 	walletfile = configfile + '.wlt'
-	rsafile = configfile + '.key'
 	configfile = configfile + '.cfg'
 	
-	files = base64.b64encode(pickle.dumps(files))
+	files = base64.b64encode(pickle.dumps(file_dict))
 	
-	rsacontent = ''
-	configcontent = ''
+	rsacontent = base64.b64encode(pickle.dumps(rsa_key))
 	
-	for bytes in read_bytes_from_file(rsafile):
-		rsacontent += base64.b64encode(bytes)
-		
-	for bytes in read_bytes_from_file(configfile):
-		configcontent += base64.b64encode(bytes)
-	
+	configcontent = base64.b64encode(pickle.dumps(config))
+
 	walletcfg = ConfigParser.ConfigParser()
 	walletcfg.add_section('settings')
 	walletcfg.set('settings', 'rsakey', rsacontent)
@@ -303,10 +307,10 @@ if __name__ == '__main__':
 	key = hashlib.sha256(enc_pwd).digest()
 	gdc = get_dir_changes(clientdir)
 	if gdc == 'new':
-		parse_new_dir(clientdir, enc_pwd, key)
+		file_dict = parse_new_dir(clientdir, enc_pwd, key)
 	else:
-		parse_dir_changes(clientdir, gdc, enc_pwd, key)
-	save_client_wallet(configfile, gdc)
+		file_dict = parse_dir_changes(clientdir, gdc, enc_pwd, key)
+	save_client_wallet(configfile, config, rsa_key, file_dict)
 	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
 	config.write(open(configfile + '.cfg', 'wb'))
