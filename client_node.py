@@ -45,7 +45,9 @@ class FileTransferProtocol(basic.LineReceiver):
 		for bytes in read_bytes_from_file(file_path):
 			self.transport.write(bytes)
 		
-		self.transport.write('\r\n')   
+		self.transport.write('\r\n')  
+		
+		os.unlink(file_path + '/' + filename) 
 		
 		# When the transfer is finished, we go back to the line mode 
 		self.setLineMode()
@@ -162,7 +164,7 @@ def parse_new_dir(directory, pwd, key):
 				continue
 			else:
 				original_file = directory + '/' + file
-				new_file = hashlib.sha256(pwd + directory + '/' + file).hexdigest()
+				new_file = hashlib.sha256(pwd + root + '/' + file).hexdigest()
 				encrypt_file(key, original_file, directory + '/tmp~/' + new_file)
 				file_dict[new_file] = original_file
 			return file_dict
@@ -177,6 +179,17 @@ def parse_tmp_dir(directory):
 		for file in files:
 			tmp_files.append((root, file, os.stat(root + '/' + file).st_size, get_file_sha256_hash(root + '/' + file)))
 	return tmp_files
+
+def parse_existing_clientdir(pwd, directory):
+	file_dict = {}
+	for root, dirs, files in os.walk(directory):
+		for fileName in files:
+			if fileName[-1] == '~' or root[-1] == '~':
+				continue
+			else:
+				relFile = root + '/' + fileName
+				file_dict[hashlib.sha256(pwd + relDir).hexdigest()] = relFile
+	return file_dict
 
 def load_client_wallet(configfile):
 	walletfile = configfile + '.wlt'
@@ -281,13 +294,24 @@ class MediatorClientProtocol(basic.LineReceiver):
 class MediatorClientFactory(protocol.ClientFactory):
 	protocol = MediatorClientProtocol
 	
-	def __init__(self, clientdir, rsa_key, files, redundancy):
+	def __init__(self, clientdir, rsa_key, send_files, redundancy, get_files):
 		self.clientdir = clientdir
 		self.rsa_key = rsa_key
-		self.files = files
+		self.files = send_files
 		self.file_count = len(self.files)
+		self.get_files = get_files
 		self.enc_pwd = enc_pwd
 		self.redundancy = redundancy
+
+def process_file_list(gdc, existing_file_dict, new_file_dict):
+	get_list = []
+	
+	for x in existing_file_dict:
+		if x not in new_file_dict:
+			get_list.append(x)
+	
+	file_dict = dict(existing_file_dict.items() + new_file_dict.items())
+	return file_dict, get_list
 
 if __name__ == '__main__':
 	# What follows is a bunch of hardcoded stuff for use while building the system.
@@ -299,7 +323,9 @@ if __name__ == '__main__':
 	walletcfg = ConfigParser.ConfigParser()
 	config.readfp(open(configfile + '.cfg'))
 	walletcfg.readfp(open(configfile + '.wlt'))
+	previous_file_dict = load_client_wallet(configfile)[0]
 	clientdir = config.get('client', 'path')
+	existing_file_dict = parse_existing_clientdir(clientdir)
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
 	rsa_key = get_rsa_key(config)
@@ -307,12 +333,14 @@ if __name__ == '__main__':
 	key = hashlib.sha256(enc_pwd).digest()
 	gdc = get_dir_changes(clientdir)
 	if gdc == 'new':
-		file_dict = parse_new_dir(clientdir, enc_pwd, key)
+		new_file_dict = parse_new_dir(clientdir, enc_pwd, key)
 	else:
-		file_dict = parse_dir_changes(clientdir, gdc, enc_pwd, key)
+		new_file_dict = parse_dir_changes(clientdir, gdc, enc_pwd, key)
+	file_dict = dict(previous_file_dict.items() + new_file_dict.items())
+	file_dict, get_list = process_file_list(gdc, existing_file_dict, file_dict)
 	save_client_wallet(configfile, config, rsa_key, file_dict)
 	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
 	config.write(open(configfile + '.cfg', 'wb'))
-	reactor.connectTCP(med_ip, med_port, MediatorClientFactory(clientdir, rsa_key, tmp_files, 2))
+	reactor.connectTCP(med_ip, med_port, MediatorClientFactory(clientdir, rsa_key, tmp_files, 2, get_list))
 	reactor.run()
