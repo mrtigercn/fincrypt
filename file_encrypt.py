@@ -27,7 +27,7 @@ def encrypt_file(key, in_filename, out_filename=None, chunksize=64*1024):
     if not out_filename:
         out_filename = in_filename + '.enc'
 
-    iv = ''.join(i for i in sha256(out_filename).digest[16:])
+    iv = sha256(out_filename).digest()[16:]
     encryptor = AES.new(key, AES.MODE_CBC, iv)
     filesize = os.path.getsize(in_filename)
 

@@ -376,13 +376,13 @@ if __name__ == '__main__':
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
 	gdc = get_dir_changes(clientdir)
+	print gdc
 	if gdc == 'new':
 		new_file_dict = parse_new_dir(clientdir, enc_pwd, key)
 	else:
 		new_file_dict = parse_dir_changes(clientdir, gdc, enc_pwd, key)
 	file_dict = dict(existing_file_dict.items() + new_file_dict.items())
 	file_dict, get_list = process_file_list(previous_file_dict, existing_file_dict)
-	print get_list
 	save_client_wallet(configfile, config, rsa_key, file_dict)
 	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
