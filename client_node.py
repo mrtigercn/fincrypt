@@ -114,7 +114,7 @@ class FileTransferProtocol(basic.LineReceiver):
 				try:
 					self.factory.client.process_restore_folder()
 				except AttributeError:
-					continue
+					return
 			else:
 				os.unlink(file_path)
 				print 'File %s has been successfully transfered, but deleted due to invalid MD5 hash' % (filename)
