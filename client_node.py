@@ -374,8 +374,6 @@ if __name__ == '__main__':
 	if os.path.exists(clientdir + '/restore~'):
 		process_restore_folder(previous_file_dict, clientdir, key)
 	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
-	print existing_file_dict
-	print previous_file_dict
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
 	gdc = get_dir_changes(clientdir)
@@ -385,6 +383,7 @@ if __name__ == '__main__':
 		new_file_dict = parse_dir_changes(clientdir, gdc, enc_pwd, key)
 	file_dict = dict(existing_file_dict.items() + new_file_dict.items())
 	file_dict, get_list = process_file_list(previous_file_dict, existing_file_dict)
+	print get_list
 	save_client_wallet(configfile, config, rsa_key, file_dict)
 	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
