@@ -182,8 +182,10 @@ def parse_tmp_dir(directory):
 
 def parse_existing_clientdir(pwd, directory):
 	file_dict = {}
-	for root, dirs, files in os.walk(directory):
+	d = Dir(directory)
+	for root, dirs, files in d.walk():
 		for fileName in files:
+			print root, fileName
 			if fileName[-1] == '~' or root[-1] == '~':
 				continue
 			else:
@@ -273,8 +275,9 @@ class MediatorClientProtocol(basic.LineReceiver):
 		elif cmd == 'NEWVERIFYHASH':
 			self.new_verify_hash(msg)
 		elif cmd == 'NODEDETAILS':
-			data = pickle.loads(base64.b64decode(msg[0]))
-			reactor.connectTCP(data[0], data[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  data[2]))
+			print msg
+			if msg[0] != 'NOT FOUND':
+				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2]))
 		else:
 			print msg
 	
@@ -327,12 +330,11 @@ def process_file_list(previous_file_dict, current_file_dict):
 	get_list = []
 	
 	if previous_file_dict == 'new':
-		return new_file_dict, []
+		return current_file_dict, []
 	
 	for x in previous_file_dict:
 		if x not in current_file_dict:
 			get_list.append(x)
-	
 	file_dict = dict(previous_file_dict.items() + current_file_dict.items())
 	return file_dict, get_list
 
@@ -353,6 +355,7 @@ if __name__ == '__main__':
 		os.makedirs(clientdir)
 	enc_pwd = config.get('client', 'password')
 	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
+	print existing_file_dict
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
 	key = hashlib.sha256(enc_pwd).digest()
