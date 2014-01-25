@@ -50,7 +50,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	
 	def handle_RESOLVESTORAGENODE(self, msg):
 		filename = msg[0]
-		print filename
 		if filename in self.factory.files:
 			# Need to filter to active only
 			snode = self.factory.files[filename]['snodes']['list'][0]
@@ -86,13 +85,11 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 		filename, sha256_hash = msg
 		history = self.factory.files[filename]['snodes'][self.name]['history']
 		if self.factory.files[filename]['original_sha256'] == sha256_hash:
-			print filename, True
 			self.factory.files[filename]['snodes'][self.name]['history'] = history[0] + 1, history[1] + 1
 			self.factory.files[filename]['snodes'][self.name]['status'] = 'VERIFIED'
 			self.factory.add_node_to_file(filename)
 			self.factory.propogate_file_to_nodes(filename, self.name)
 		else:
-			print filename, False
 			self.factory.files[filename]['snodes'][self.name]['history'] = history[0], history[1] + 1
 			self.factory.add_node_to_file(filename)
 	
@@ -125,7 +122,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.transport.write(self.factory.encode(("ERROR", "Public Key not verified!\n")))
 	
 	def handle_NEWCLIENTFILE(self, msg):
-		print msg
 		detail_string, signature = msg
 		if not self.publickey.verify(hashlib.sha256(detail_string).hexdigest(), signature):
 			self.transport.write("Error! Public key not verified!\n")
@@ -149,6 +145,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 					self.factory.files[filename]['snodes']['list'].append(snodes[y][0])
 					found += 1
 				y += 1
+		print self.factory.files[filename]['original_sha256'] + '\n', sha256hash
 		elif filename in self.factory.files and self.factory.files[filename]['original_sha256'] == sha256hash:
 			self.transport.write(self.factory.encode(("PRINT", "File '%s' Up to Date" % filename)) + '\n')
 			return
