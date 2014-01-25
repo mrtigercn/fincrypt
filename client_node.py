@@ -188,7 +188,7 @@ def parse_existing_clientdir(pwd, directory):
 				continue
 			else:
 				relFile = root + '/' + fileName
-				file_dict[hashlib.sha256(pwd + relDir).hexdigest()] = relFile
+				file_dict[hashlib.sha256(pwd + relFile).hexdigest()] = relFile
 	return file_dict
 
 def load_client_wallet(configfile):
@@ -201,11 +201,22 @@ def load_client_wallet(configfile):
 	except IOError:
 		return 'new', 'new', 'new'
 	
-	files = pickle.loads(base64.b64decode(walletcfg.get('settings', 'files')))
-	rsacontent = pickle.loads(base64.b64decode(walletcfg.get('settings', 'rsakey')))
-	configcontent = pickle.loads(base64.b64decode(walletcfg.get('settings', 'config')))
+	try:
+		files = pickle.loads(base64.b64decode(walletcfg.get('settings', 'files')))
+	except:
+		files = 'new'
 	
-	return files, rsa_key, config
+	try:
+		rsacontent = pickle.loads(base64.b64decode(walletcfg.get('settings', 'rsakey')))
+	except:
+		rsacontent = RSA.generate(4096)
+	
+	try:
+		configcontent = pickle.loads(base64.b64decode(walletcfg.get('settings', 'config')))
+	except:
+		configcontent = 'new'
+	
+	return files, rsacontent, config
 
 def save_client_wallet(configfile, config, rsa_key, file_dict):
 	walletfile = configfile + '.wlt'
@@ -325,11 +336,11 @@ if __name__ == '__main__':
 	walletcfg.readfp(open(configfile + '.wlt'))
 	previous_file_dict = load_client_wallet(configfile)[0]
 	clientdir = config.get('client', 'path')
-	existing_file_dict = parse_existing_clientdir(clientdir)
+	enc_pwd = config.get('client', 'password')
+	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
 	rsa_key = get_rsa_key(config)
-	enc_pwd = config.get('client', 'password')
 	key = hashlib.sha256(enc_pwd).digest()
 	gdc = get_dir_changes(clientdir)
 	if gdc == 'new':
