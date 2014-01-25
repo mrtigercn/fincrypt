@@ -204,7 +204,7 @@ def load_client_wallet(configfile):
 	try:
 		walletcfg.readfp(open(walletfile))
 	except IOError:
-		return 'new', 'new', 'new'
+		return 'new', RSA.generate(4096), 'new'
 	
 	try:
 		files = pickle.loads(base64.b64decode(walletcfg.get('settings', 'files')))
