@@ -280,7 +280,7 @@ if __name__ == '__main__':
 	configport = int(config.get('mediator', 'port'))
 	rsa_key = get_rsa_key(config)
 	try:
-		files = config.get('mediator', 'files')
+		files = pickle.loads(base64.b64decode(config.get('mediator', 'files')))
 	except ConfigParser.NoOptionError:
 		files = {}
 	
