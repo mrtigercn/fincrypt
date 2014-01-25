@@ -48,6 +48,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	
 	def handle_RESOLVESTORAGENODE(self, msg):
 		filename = msg
+		print filename
 		if filename in self.factory.files:
 			# Need to filter to active only
 			snode = self.factory.files[filename]['snodes']['list'][0]

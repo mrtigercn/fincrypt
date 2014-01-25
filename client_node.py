@@ -141,6 +141,7 @@ def get_dir_changes(directory):
 
 def parse_dir_changes(directory, changes, pwd, key):
 	file_dict = {}
+	print changes
 	if not os.path.exists(directory + '/tmp~'):
 		os.makedirs(directory + '/tmp~')
 	for file in changes['created'] + changes['updated']:
@@ -155,6 +156,7 @@ def parse_dir_changes(directory, changes, pwd, key):
 
 def parse_new_dir(directory, pwd, key):
 	file_dict = {}
+	curdir = os.getcwd()
 	if not os.path.exists(directory + '/tmp~'):
 		os.makedirs(directory + '/tmp~')
 	d = Dir(directory)
@@ -163,8 +165,8 @@ def parse_new_dir(directory, pwd, key):
 			if file[-1] == '~' or root[-1] == '~':
 				continue
 			else:
-				original_file = directory + '/' + file
-				new_file = hashlib.sha256(pwd + root + '/' + file).hexdigest()
+				original_file = root + '/' + file
+				new_file = hashlib.sha256(pwd + root[len(curdir) + 1:] + '/' + file).hexdigest()
 				encrypt_file(key, original_file, directory + '/tmp~/' + new_file)
 				file_dict[new_file] = original_file
 	return file_dict
@@ -182,6 +184,7 @@ def parse_tmp_dir(directory):
 
 def parse_existing_clientdir(pwd, directory):
 	file_dict = {}
+	curdir = os.getcwd()
 	d = Dir(directory)
 	for root, dirs, files in d.walk():
 		for fileName in files:
@@ -189,7 +192,7 @@ def parse_existing_clientdir(pwd, directory):
 			if fileName[-1] == '~' or root[-1] == '~':
 				continue
 			else:
-				relFile = root + '/' + fileName
+				relFile = root[len(curdir) + 1:] + '/' + fileName
 				file_dict[hashlib.sha256(pwd + relFile).hexdigest()] = relFile
 	return file_dict
 
@@ -268,6 +271,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 		elif cmd == 'REG_CONFIRM':
 			self.transport.write(self.file_changes() + '\n')
 			for x in self.factory.get_files:
+				print x
 				self.transport.write(base64.b64encode(pickle.dumps(("RESOLVESTORAGENODE", x))) + '\n')
 		elif cmd == 'STORAGE_DETAILS':
 			data = pickle.loads(base64.b64decode(msg[0]))
@@ -356,6 +360,7 @@ if __name__ == '__main__':
 	enc_pwd = config.get('client', 'password')
 	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
 	print existing_file_dict
+	print previous_file_dict
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
 	key = hashlib.sha256(enc_pwd).digest()
