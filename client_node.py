@@ -38,9 +38,8 @@ class FileTransferProtocol(basic.LineReceiver):
 		
 		print 'Uploading file: %s (%d KB)' % (filename, file_size)
 		
-		global rsa_key
 		md5_hash = get_file_md5_hash(file_path)
-		signature = self.rsa_key.sign(md5_hash, '')
+		signature = self.factory.rsa_key.sign(md5_hash, '')
 		
 		self.transport.write('PUT %s %s %s\n' % (filename, md5_hash, base64.b64encode(pickle.dumps(signature))))
 		#self.setRawMode()
@@ -112,7 +111,10 @@ class FileTransferProtocol(basic.LineReceiver):
 			
 			if validate_file_md5_hash(file_path, self.file_data[1]):
 				print 'File %s has been successfully transfered and saved' % (filename)
-				self.factory.client.process_restore_folder()
+				try:
+					self.factory.client.process_restore_folder()
+				except AttributeError:
+					continue
 			else:
 				os.unlink(file_path)
 				print 'File %s has been successfully transfered, but deleted due to invalid MD5 hash' % (filename)
@@ -277,13 +279,13 @@ class MediatorClientProtocol(basic.LineReceiver):
 				self.transport.write(base64.b64encode(pickle.dumps(("RESOLVESTORAGENODE", x))) + '\n')
 		elif cmd == 'STORAGE_DETAILS':
 			data = pickle.loads(base64.b64decode(msg[0]))
-			reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', self.factory.clientdir + '/tmp~', data[2]))
+			reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', self.factory.clientdir + '/tmp~', data[2], rsa_key=self.factory.rsa_key))
 		elif cmd == 'NEWVERIFYHASH':
 			self.new_verify_hash(msg)
 		elif cmd == 'NODEDETAILS':
 			print msg
 			if msg[0] != 'NOT FOUND':
-				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2], client=self.factory.client, rsa_key=self.factory.rsa_key))
+				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2], client=self.factory.client))
 		else:
 			print msg
 	

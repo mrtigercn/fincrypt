@@ -176,10 +176,10 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 class FincryptMediatorFactory(protocol.ServerFactory):
 	protocol = FincryptMediatorProtocol
 	
-	def __init__(self):
+	def __init__(self, files):
 		self.clients = {}
 		self.storage_nodes = {}
-		self.files = {}
+		self.files = files
 		self.deferred = defer.Deferred()
 		self.defer_verification = task.deferLater(reactor, 3600.0, self.init_verification)
 	
@@ -279,8 +279,12 @@ if __name__ == '__main__':
 	config.readfp(open(configfile + '.cfg'))
 	configport = int(config.get('mediator', 'port'))
 	rsa_key = get_rsa_key(config)
-	config.write(open(configfile + '.cfg', 'wb'))
-	fmf = FincryptMediatorFactory()
+	try:
+		files = config.get('mediator', 'files')
+	except ConfigParser.NoOptionError:
+		files = {}
+	
+	fmf = FincryptMediatorFactory(files)
 	
 	@atexit.register
 	def goodbye():
