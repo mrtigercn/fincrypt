@@ -320,7 +320,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 class MediatorClientFactory(protocol.ClientFactory):
 	protocol = MediatorClientProtocol
 	
-	def __init__(self, clientdir, rsa_key, send_files, redundancy, get_files):
+	def __init__(self, clientdir, rsa_key, send_files, redundancy, get_files, enc_pwd):
 		self.clientdir = clientdir
 		self.rsa_key = rsa_key
 		self.files = send_files
@@ -353,39 +353,49 @@ def process_restore_folder(file_dict, directory, key):
 				decrypt_file(key, root + '/' + file, file_dict[file])
 				os.unlink(root + '/' + file)
 
+class ClientNode():
+	def __init__(self, configfile, debug=False):
+		self.debug = debug
+		self.configfile = configfile
+		self.walletcfg = ConfigParser.ConfigParser()
+		self.walletcfg.readfp(open(self.configfile + '.wlt'))
+		self.wallet_info = load_client_wallet(self.configfile)
+		self.previous_file_dict = self.wallet_info[0]
+		self.rsa_key = self.wallet_info[1]
+		self.config = self.wallet_info[2]
+		self.clientdir = self.config.get('client', 'path')
+		if not os.path.exists(self.clientdir):
+			os.makedirs(self.clientdir)
+		self.enc_pwd = self.config.get('client', 'password')
+		self.key = hashlib.sha256(self.enc_pwd).digest()
+		if os.path.exists(self.clientdir + '/restore~'):
+			process_restore_folder(self.previous_file_dict, self.clientdir, self.key)
+		self.existing_file_dict = parse_existing_clientdir(self.enc_pwd, self.clientdir)
+		self.med_ip = self.config.get('client', 'ip')
+		self.med_port = int(self.config.get('client', 'port'))
+		self.gdc = get_dir_changes(self.clientdir)
+		if self.gdc == 'new':
+			self.new_file_dict = parse_new_dir(self.clientdir, self.enc_pwd, self.key)
+		else:
+			self.new_file_dict = parse_dir_changes(self.clientdir, self.gdc, self.enc_pwd, self.key)
+		self.file_dict = dict(self.existing_file_dict.items() + self.new_file_dict.items())
+		self.file_dict, self.get_list = process_file_list(self.previous_file_dict, self.existing_file_dict)
+		save_client_wallet(self.configfile, self.config, self.rsa_key, self.file_dict)
+		self.tmp_files = parse_tmp_dir(self.clientdir)
+		self.config.write(open(configfile + '.cfg', 'wb'))
+	
+	def connect(self):
+		defer.setDebugging(self.debug)
+		reactor.connectTCP(self.med_ip, self.med_port, MediatorClientFactory(self.clientdir, self.rsa_key, self.tmp_files, 2, self.get_list, self.enc_pwd))
+		reactor.run()
+	
+
 if __name__ == '__main__':
 	# What follows is a bunch of hardcoded stuff for use while building the system.
 	try:
 		configfile = sys.argv[1]
 	except IndexError:
 		configfile = 'client'
-	walletcfg = ConfigParser.ConfigParser()
-	walletcfg.readfp(open(configfile + '.wlt'))
-	wallet_info = load_client_wallet(configfile)
-	previous_file_dict = wallet_info[0]
-	rsa_key = wallet_info[1]
-	config = wallet_info[2]
-	clientdir = config.get('client', 'path')
-	if not os.path.exists(clientdir):
-		os.makedirs(clientdir)
-	enc_pwd = config.get('client', 'password')
-	key = hashlib.sha256(enc_pwd).digest()
-	if os.path.exists(clientdir + '/restore~'):
-		process_restore_folder(previous_file_dict, clientdir, key)
-	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
-	med_ip = config.get('client', 'ip')
-	med_port = int(config.get('client', 'port'))
-	gdc = get_dir_changes(clientdir)
-	print gdc
-	if gdc == 'new':
-		new_file_dict = parse_new_dir(clientdir, enc_pwd, key)
-	else:
-		new_file_dict = parse_dir_changes(clientdir, gdc, enc_pwd, key)
-	file_dict = dict(existing_file_dict.items() + new_file_dict.items())
-	file_dict, get_list = process_file_list(previous_file_dict, existing_file_dict)
-	save_client_wallet(configfile, config, rsa_key, file_dict)
-	tmp_files = parse_tmp_dir(clientdir)
-	defer.setDebugging(True)
-	config.write(open(configfile + '.cfg', 'wb'))
-	reactor.connectTCP(med_ip, med_port, MediatorClientFactory(clientdir, rsa_key, tmp_files, 2, get_list))
-	reactor.run()
+	
+	cn = ClientNode(configfile, debug=True)
+	cn.connect()
