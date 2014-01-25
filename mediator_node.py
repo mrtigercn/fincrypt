@@ -127,7 +127,8 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.transport.write("Error! Public key not verified!\n")
 			return
 		filename, filesize, sha256hash = pickle.loads(base64.b64decode(detail_string))
-		print self.factory.files[filename]['original_sha256'] + '\n', sha256hash
+		if filename in self.factory.files:
+			print self.factory.files[filename]['original_sha256'] + '\n', sha256hash
 		if filename not in self.factory.files:
 			self.factory.files[filename] = {}
 			self.factory.files[filename]['snodes'] = {}
