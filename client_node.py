@@ -207,7 +207,7 @@ def load_client_wallet(configfile):
 	try:
 		walletcfg.readfp(open(walletfile))
 	except IOError:
-		return 'new', RSA.generate(4096), 'new'
+		return 'new', RSA.generate(4096), ConfigParser.ConfigParser()
 	
 	try:
 		files = pickle.loads(base64.b64decode(walletcfg.get('settings', 'files')))
@@ -353,22 +353,37 @@ class ClientNode():
 	def __init__(self, configfile, debug=False):
 		self.debug = debug
 		self.configfile = configfile
-		self.walletcfg = ConfigParser.ConfigParser()
-		self.walletcfg.readfp(open(self.configfile + '.wlt'))
 		self.wallet_info = load_client_wallet(self.configfile)
 		self.previous_file_dict = self.wallet_info[0]
 		self.rsa_key = self.wallet_info[1]
 		self.config = self.wallet_info[2]
-		self.clientdir = self.config.get('client', 'path')
+		try:
+			self.clientdir = self.config.get('client', 'path')
+		except:
+			self.clientdir = sys.argv[2]
+		
 		if not os.path.exists(self.clientdir):
 			os.makedirs(self.clientdir)
-		self.enc_pwd = self.config.get('client', 'password')
+			
+		try:
+			self.enc_pwd = self.config.get('client', 'password')
+		except:
+			self.enc_pwd = sys.argv[3]
+		
 		self.key = hashlib.sha256(self.enc_pwd).digest()
+		
 		if os.path.exists(self.clientdir + '/restore~'):
 			self.process_restore_folder()
+		
 		self.existing_file_dict = parse_existing_clientdir(self.enc_pwd, self.clientdir)
-		self.med_ip = self.config.get('client', 'ip')
-		self.med_port = int(self.config.get('client', 'port'))
+		
+		try:
+			self.med_ip = self.config.get('client', 'ip')
+			self.med_port = int(self.config.get('client', 'port'))
+		except:
+			self.med_ip = '162.243.36.143'
+			self.med_port = 8001
+		
 		self.gdc = get_dir_changes(self.clientdir)
 		if self.gdc == 'new':
 			self.new_file_dict = parse_new_dir(self.clientdir, self.enc_pwd, self.key)
@@ -378,6 +393,12 @@ class ClientNode():
 		self.file_dict, self.get_list = process_file_list(self.previous_file_dict, self.existing_file_dict)
 		save_client_wallet(self.configfile, self.config, self.rsa_key, self.file_dict)
 		self.tmp_files = parse_tmp_dir(self.clientdir)
+		
+		self.config.set('client', 'path', self.clientdir)
+		self.config.set('client', 'password', self.enc_pwd)
+		self.config.set('client', 'ip', self.med_ip)
+		self.config.set('client', 'port', self.med_port)
+		
 		self.config.write(open(configfile + '.cfg', 'wb'))
 	
 	def connect(self):

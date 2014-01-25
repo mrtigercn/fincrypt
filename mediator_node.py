@@ -284,8 +284,6 @@ if __name__ == '__main__':
 	except ConfigParser.NoOptionError:
 		files = {}
 	
-	print files
-	
 	fmf = FincryptMediatorFactory(files)
 	
 	@atexit.register

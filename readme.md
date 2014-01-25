@@ -5,6 +5,13 @@ This project aims to be a distributed, encrypted filestore that is resiliant aga
 
 Anyone can run the software to provide more storage space for the network, and each node that provides storage space that is utilized will be paid for their resources in Bitcoin.
 
+### Try It Out
+The first time you run the Client software, you'll need to specify a directory and password. Enter the directory you have placed the files in and run the following line:
+
+    python client_node.py client <relative_folder_path> <password>
+
+After this, you can start the client with 'python client_node.py'.
+
 A client using this software will point their client at a directory (or directories) they wish to have backed up.
 
 Any time the contents of a monitored directory are modified, the modified files will be AES encrypted and then sent to multiple peers for redundant backup.
