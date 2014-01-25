@@ -125,13 +125,12 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.transport.write(self.factory.encode(("ERROR", "Public Key not verified!\n")))
 	
 	def handle_NEWCLIENTFILE(self, msg):
-		# msg = [ detail_string, signature ]
+		print msg
 		detail_string, signature = msg
 		if not self.publickey.verify(hashlib.sha256(detail_string).hexdigest(), signature):
 			self.transport.write("Error! Public key not verified!\n")
 			return
-		data = pickle.loads(base64.b64decode(detail_string))
-		filename, filesize, sha256hash = data
+		filename, filesize, sha256hash = pickle.loads(base64.b64decode(detail_string))
 		if filename not in self.factory.files:
 			self.factory.files[filename] = {}
 			self.factory.files[filename]['snodes'] = {}

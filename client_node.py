@@ -269,7 +269,10 @@ class MediatorClientProtocol(basic.LineReceiver):
 			register_details = self.mediator_details()
 			self.transport.write(register_details + '\n')
 		elif cmd == 'REG_CONFIRM':
-			self.transport.write(self.file_changes() + '\n')
+			file_changes = self.file_changes()
+			for x in file_changes:
+				print x
+				self.transport.write(base64.b64encode(pickle.dumps(("NEWCLIENTFILE", x))) + '\n')
 			for x in self.factory.get_files:
 				print x
 				self.transport.write(base64.b64encode(pickle.dumps(("RESOLVESTORAGENODE", x))) + '\n')
@@ -307,10 +310,10 @@ class MediatorClientProtocol(basic.LineReceiver):
 	def file_changes(self):
 		change_list = []
 		for x in self.factory.files:
-			change_list.append((x[1], x[2], x[3]))
-		change_list = base64.b64encode(pickle.dumps(change_list))
-		signature = self.factory.rsa_key.sign(hashlib.sha256(change_list).hexdigest(), "")
-		return base64.b64encode(pickle.dumps(('CLIENTFILES', change_list, signature)))
+			detail_string = base64.b64encode(pickle.dumps((x[1], x[2], x[3])))
+			signature = self.factory.rsa_key.sign(hashlib.sha256(detail_string).hexdigest(), "")
+			change_list.append((detail_string, signature))
+		return change_list
 	
 	def mediator_details(self):
 		detail_string = base64.b64encode(pickle.dumps(('CLIENT', self.factory.redundancy)))
