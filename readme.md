@@ -10,7 +10,11 @@ The first time you run the Client software, you'll need to specify a directory a
 
     python client_node.py client <relative_folder_path> <password>
 
-After this, you can start the client with 'python client_node.py'.
+After this, you can start the client with:
+
+    python client_node.py
+
+I will be running a Mediator and a few Storage Nodes for the time being, but as I will be restarting these fairly frequently as well as updating the software frequently, don't rely on them for the time being.
 
 A client using this software will point their client at a directory (or directories) they wish to have backed up.
 
