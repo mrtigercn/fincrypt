@@ -42,7 +42,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 		elif cmd == 'VERIFY' and self.type == 'STORAGE':
 			self.handle_STORAGE_VERIFY(msg)
 		elif cmd == 'NEWCLIENTFILE':
-			self.handle_NEWCLIENTFILE(msg)
+			self.handle_NEWCLIENTFILE(msg[0])
 		elif self.state == 'CONNECTED' and self.type == 'CLIENT':
 			self.handle_CLIENT(msg)
 		elif self.state == 'CONNECTED' and self.type == 'STORAGE':
