@@ -132,13 +132,11 @@ def get_dir_changes(directory):
 	dir_state_new = DirState(d)
 	try:
 		d2 = Dir('./')
-		jsons = d2.files(directory + "*.json")
-		jsons.sort(reverse=True)
-		dir_state_old = DirState.from_json(jsons[0])
+		dir_state_old = DirState.from_json(directory + '.json')
 		dir_state_new.to_json()
 		return dir_state_new - dir_state_old
 	except:
-		dir_state_new.to_json()
+		dir_state_new.to_json(fmt=directory + '.json')
 		return 'new'
 
 def parse_dir_changes(directory, changes, pwd, key):
