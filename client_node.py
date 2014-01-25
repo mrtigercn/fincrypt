@@ -112,6 +112,7 @@ class FileTransferProtocol(basic.LineReceiver):
 			
 			if validate_file_md5_hash(file_path, self.file_data[1]):
 				print 'File %s has been successfully transfered and saved' % (filename)
+				self.factory.client.process_restore_folder()
 			else:
 				os.unlink(file_path)
 				print 'File %s has been successfully transfered, but deleted due to invalid MD5 hash' % (filename)
@@ -121,8 +122,9 @@ class FileTransferProtocol(basic.LineReceiver):
 class FileTransferClientFactory(protocol.ClientFactory):
 	protocol = FileTransferProtocol
 	
-	def __init__(self, cmd, files_path, filename):
+	def __init__(self, cmd, files_path, filename, client=None):
 		self.cmd = cmd
+		self.client = client
 		self.files_path = files_path
 		self.filename = filename
 		self.deferred = defer.Deferred()
@@ -280,7 +282,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 		elif cmd == 'NODEDETAILS':
 			print msg
 			if msg[0] != 'NOT FOUND':
-				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2]))
+				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2], client=self.factory.client))
 		else:
 			print msg
 	
@@ -320,8 +322,9 @@ class MediatorClientProtocol(basic.LineReceiver):
 class MediatorClientFactory(protocol.ClientFactory):
 	protocol = MediatorClientProtocol
 	
-	def __init__(self, clientdir, rsa_key, send_files, redundancy, get_files, enc_pwd):
+	def __init__(self, clientdir, rsa_key, send_files, redundancy, get_files, enc_pwd, client):
 		self.clientdir = clientdir
+		self.client = client
 		self.rsa_key = rsa_key
 		self.files = send_files
 		self.file_count = len(self.files)
@@ -341,17 +344,7 @@ def process_file_list(previous_file_dict, current_file_dict):
 	file_dict = dict(previous_file_dict.items() + current_file_dict.items())
 	return file_dict, get_list
 
-def process_restore_folder(file_dict, directory, key):
-	restoredir = directory + '/restore~'
-	d = Dir(restoredir)
-	
-	for root, dirs, files in d.walk():
-		for file in files:
-			if file in file_dict:
-				if not os.path.exists(os.path.dirname(file_dict[file])):
-					os.makedirs(os.path.dirname(file_dict[file]))
-				decrypt_file(key, root + '/' + file, file_dict[file])
-				os.unlink(root + '/' + file)
+
 
 class ClientNode():
 	def __init__(self, configfile, debug=False):
@@ -369,7 +362,7 @@ class ClientNode():
 		self.enc_pwd = self.config.get('client', 'password')
 		self.key = hashlib.sha256(self.enc_pwd).digest()
 		if os.path.exists(self.clientdir + '/restore~'):
-			process_restore_folder(self.previous_file_dict, self.clientdir, self.key)
+			self.process_restore_folder()
 		self.existing_file_dict = parse_existing_clientdir(self.enc_pwd, self.clientdir)
 		self.med_ip = self.config.get('client', 'ip')
 		self.med_port = int(self.config.get('client', 'port'))
@@ -386,9 +379,20 @@ class ClientNode():
 	
 	def connect(self):
 		defer.setDebugging(self.debug)
-		reactor.connectTCP(self.med_ip, self.med_port, MediatorClientFactory(self.clientdir, self.rsa_key, self.tmp_files, 2, self.get_list, self.enc_pwd))
+		reactor.connectTCP(self.med_ip, self.med_port, MediatorClientFactory(self.clientdir, self.rsa_key, self.tmp_files, 2, self.get_list, self.enc_pwd, self))
 		reactor.run()
 	
+	def process_restore_folder(self):
+		restoredir = self.clientdir + '/restore~'
+		d = Dir(restoredir)
+	
+		for root, dirs, files in d.walk():
+			for file in files:
+				if file in self.file_dict:
+					if not os.path.exists(os.path.dirname(self.file_dict[file])):
+						os.makedirs(os.path.dirname(self.file_dict[file]))
+					decrypt_file(self.key, root + '/' + file, self.file_dict[file])
+					os.unlink(root + '/' + file)
 
 if __name__ == '__main__':
 	# What follows is a bunch of hardcoded stuff for use while building the system.
