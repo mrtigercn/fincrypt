@@ -7,6 +7,8 @@ from common import COMMANDS, display_message, validate_file_md5_hash, get_file_m
 
 import pickle, base64, hashlib, random
 
+import atexit
+
 from Crypto.PublicKey import RSA
 
 class FincryptMediatorProtocol(basic.LineReceiver):
@@ -181,6 +183,9 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		self.deferred = defer.Deferred()
 		self.defer_verification = task.deferLater(reactor, 3600.0, self.init_verification)
 	
+	def export_files(self):
+		return base64.encode(pickle.dumps(self.files))
+	
 	def init_verification(self):
 		self.l = task.LoopingCall(self.handle_file_verification)
 		self.l.start(60.0)
@@ -275,6 +280,13 @@ if __name__ == '__main__':
 	configport = int(config.get('mediator', 'port'))
 	rsa_key = get_rsa_key(config)
 	config.write(open(configfile + '.cfg', 'wb'))
+	fmf = FincryptMediatorFactory()
 	
-	reactor.listenTCP(configport, FincryptMediatorFactory())
+	@atexit.register
+	def goodbye():
+		config.set('mediator', 'files', fmf.export_files())
+		config.write(open(configfile + '.cfg', 'wb'))
+	
+	reactor.listenTCP(configport, fmf)
 	reactor.run()
+	
