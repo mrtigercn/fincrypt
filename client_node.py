@@ -24,6 +24,8 @@ class FileTransferProtocol(basic.LineReceiver):
 	#		self.transport.loseConnection()
 	
 	def _get_file(self, filename):
+		if not os.path.exists(self.factory.files_path):
+			os.makedirs(self.factory.files_path)
 		self.transport.write('%s %s\n' % ('get', filename))
 	
 	def _send_file(self, file_path, filename):
