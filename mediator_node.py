@@ -48,7 +48,7 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	
 	def handle_RESOLVESTORAGENODE(self, msg):
 		filename = msg[0]
-		if filename in self.factory.files
+		if filename in self.factory.files:
 			# Need to filter to active only
 			snode = self.factory.files[filename]['snodes']['list'][0]
 			self.transport.write(self.factory.encode(("NODEDETAILS", self.factory.storage_nodes[snode].ip, self.factory.storage_nodes[snode].port, filename)) + '\n')
