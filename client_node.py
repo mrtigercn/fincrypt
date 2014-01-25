@@ -271,7 +271,6 @@ class MediatorClientProtocol(basic.LineReceiver):
 		elif cmd == 'REG_CONFIRM':
 			file_changes = self.file_changes()
 			for x in file_changes:
-				print x
 				self.transport.write(base64.b64encode(pickle.dumps(("NEWCLIENTFILE", x))) + '\n')
 			for x in self.factory.get_files:
 				print x

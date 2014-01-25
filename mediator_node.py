@@ -167,50 +167,6 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 		init_port = self.factory.storage_nodes[first_snode].port
 		self.transport.write(self.factory.encode(("STORAGE_DETAILS", base64.b64encode(pickle.dumps((init_ip, init_port, filename, self.factory.files[filename]['snodes']['list']))))) + '\n')
 	
-	def handle_CLIENT(self, msg):
-		detail_string, signature = msg
-		if self.publickey.verify(hashlib.sha256(detail_string).hexdigest(), signature):
-			data = pickle.loads(base64.b64decode(detail_string))
-			for x in data:
-				if x[0] not in self.factory.files:
-					self.factory.files[x[0]] = {}
-					self.factory.files[x[0]]['snodes'] = {}
-					self.factory.files[x[0]]['snodes']['list'] = []
-					self.factory.files[x[0]]['client'] = self.name
-					snodes = self.factory.storage_nodes.items()
-					random.shuffle(snodes)
-					found = 0
-					y = 0
-					while found < 1 and y < len(self.factory.storage_nodes):
-						if self.factory.storage_nodes[snodes[y][0]].freespace >= x[1]:
-							self.factory.files[x[0]]['snodes'][snodes[y][0]] = {}
-							self.factory.files[x[0]]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
-							self.factory.files[x[0]]['snodes'][snodes[y][0]]['last_checked'] = time.time()
-							self.factory.files[x[0]]['snodes'][snodes[y][0]]['history'] = (0,0)
-							self.factory.files[x[0]]['snodes']['list'].append(snodes[y][0])
-							found += 1
-						y += 1
-				elif x[0] in self.factory.files and self.factory.files[x[0]]['original_sha256'] == x[2]:
-					self.transport.write(self.factory.encode(("PRINT", "File '%s' Up to Date" % x[0])) + '\n')
-					continue
-				self.factory.files[x[0]]['size'] = x[1]
-				self.factory.files[x[0]]['current_nonce'] = ''
-				self.factory.files[x[0]]['original_sha256'] = x[2]
-				self.factory.files[x[0]]['current_sha256'] = x[2]
-				for snode in self.factory.files[x[0]]['snodes']:
-					if snode == 'list':
-						continue
-					self.factory.files[x[0]]['snodes'][snode]['status'] = 'UNVERIFIED'
-				first_snode = self.factory.files[x[0]]['snodes']['list'][0]
-				global rsa_key
-				self.factory.storage_nodes[first_snode].transport.write(self.factory.encode(("NEWFILE", x[0],x[1],self.publickey, '%s' % rsa_key.publickey().exportKey())) + "\n")
-				init_ip = self.factory.storage_nodes[first_snode].ip
-				init_port = self.factory.storage_nodes[first_snode].port
-				filename = x[0]
-				self.transport.write(self.factory.encode(("STORAGE_DETAILS", base64.b64encode(pickle.dumps((init_ip, init_port, filename, self.factory.files[x[0]]['snodes']['list']))))) + '\n')
-		else:
-			self.transport.write("Error! Public key not verified!\n")
-	
 	def handle_STORAGE(self, msg):
 		return
 	
