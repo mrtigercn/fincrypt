@@ -40,7 +40,7 @@ class FileTransferProtocol(basic.LineReceiver):
 		
 		global rsa_key
 		md5_hash = get_file_md5_hash(file_path)
-		signature = rsa_key.sign(md5_hash, '')
+		signature = self.rsa_key.sign(md5_hash, '')
 		
 		self.transport.write('PUT %s %s %s\n' % (filename, md5_hash, base64.b64encode(pickle.dumps(signature))))
 		#self.setRawMode()
@@ -122,8 +122,9 @@ class FileTransferProtocol(basic.LineReceiver):
 class FileTransferClientFactory(protocol.ClientFactory):
 	protocol = FileTransferProtocol
 	
-	def __init__(self, cmd, files_path, filename, client=None):
+	def __init__(self, cmd, files_path, filename, client=None, rsa_key=None):
 		self.cmd = cmd
+		self.rsa_key = rsa_key
 		self.client = client
 		self.files_path = files_path
 		self.filename = filename
@@ -282,7 +283,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 		elif cmd == 'NODEDETAILS':
 			print msg
 			if msg[0] != 'NOT FOUND':
-				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2], client=self.factory.client))
+				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2], client=self.factory.client, rsa_key=self.factory.rsa_key))
 		else:
 			print msg
 	

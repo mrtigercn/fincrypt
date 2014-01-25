@@ -184,7 +184,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		self.defer_verification = task.deferLater(reactor, 3600.0, self.init_verification)
 	
 	def export_files(self):
-		return base64.encode(pickle.dumps(self.files))
+		return base64.b64encode(pickle.dumps(self.files))
 	
 	def init_verification(self):
 		self.l = task.LoopingCall(self.handle_file_verification)
