@@ -344,6 +344,18 @@ def process_file_list(previous_file_dict, current_file_dict):
 	file_dict = dict(previous_file_dict.items() + current_file_dict.items())
 	return file_dict, get_list
 
+def process_restore_folder(file_dict, directory, key):
+	restoredir = directory + '/restore~'
+	d = Dir(restoredir)
+	
+	for root, dirs, files in d.walk():
+		for file in files:
+			if file in file_dict:
+				if not os.path.exists(os.path.dirname(file_dict[file])):
+					os.makedirs(os.path.dirname(file_dict[file]))
+				decrypt_file(key, root + '/' + file, file_dict[file])
+				os.unlink(root + '/' + file)
+
 if __name__ == '__main__':
 	# What follows is a bunch of hardcoded stuff for use while building the system.
 	try:
@@ -360,12 +372,14 @@ if __name__ == '__main__':
 	if not os.path.exists(clientdir):
 		os.makedirs(clientdir)
 	enc_pwd = config.get('client', 'password')
+	key = hashlib.sha256(enc_pwd).digest()
+	if os.path.exists(clientdir + '/restore~'):
+		process_restore_folder(previous_file_dict, clientdir, key)
 	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
 	print existing_file_dict
 	print previous_file_dict
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
-	key = hashlib.sha256(enc_pwd).digest()
 	gdc = get_dir_changes(clientdir)
 	if gdc == 'new':
 		new_file_dict = parse_new_dir(clientdir, enc_pwd, key)

@@ -180,7 +180,7 @@ class FincryptMediatorFactory(protocol.ServerFactory):
 		self.storage_nodes = {}
 		self.files = {}
 		self.deferred = defer.Deferred()
-		self.defer_verification = task.deferLater(reactor, 10.0, self.init_verification)
+		self.defer_verification = task.deferLater(reactor, 3600.0, self.init_verification)
 	
 	def init_verification(self):
 		self.l = task.LoopingCall(self.handle_file_verification)
