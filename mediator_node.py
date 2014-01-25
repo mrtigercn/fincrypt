@@ -47,9 +47,11 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.handle_STORAGE(msg)
 	
 	def handle_RESOLVESTORAGENODE(self, msg):
-		snode = msg[0]
-		if snode in self.factory.storage_nodes:
-			self.transport.write(self.factory.encode(("NODEDETAILS", self.factory.storage_nodes[snode].ip, self.factory.storage_nodes[snode].port)) + '\n')
+		filename = msg[0]
+		if filename in self.factory.files
+			# Need to filter to active only
+			snode = self.factory.files[filename]['snodes']['list'][0]
+			self.transport.write(self.factory.encode(("NODEDETAILS", self.factory.storage_nodes[snode].ip, self.factory.storage_nodes[snode].port, filename)) + '\n')
 		else:
 			self.transport.write(self.factory.encode(("NODEDETAILS", "NOT FOUND")) + '\n')
 	
@@ -69,6 +71,8 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 	
 	def handle_NEWVERIFYHASH(self, msg):
 		detail_string, signature = msg
+		if detail_string == 'NA':
+			return
 		if self.publickey.verify(hashlib.sha256(detail_string).hexdigest(), signature):
 			filename, nonce, sha256hash = self.factory.parse_message(detail_string)
 			self.factory.files[filename]['current_nonce'] = nonce

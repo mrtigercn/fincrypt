@@ -265,19 +265,28 @@ class MediatorClientProtocol(basic.LineReceiver):
 			self.transport.write(register_details + '\n')
 		elif cmd == 'REG_CONFIRM':
 			self.transport.write(self.file_changes() + '\n')
+			for x in self.factory.get_files:
+				self.transport.write(base64.b64encode(pickle.dumps(("RESOLVESTORAGENODE", x))) + '\n')
 		elif cmd == 'STORAGE_DETAILS':
 			data = pickle.loads(base64.b64decode(msg[0]))
 			reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', self.factory.clientdir + '/tmp~', data[2]))
 		elif cmd == 'NEWVERIFYHASH':
 			self.new_verify_hash(msg)
+		elif cmd == 'NODEDETAILS':
+			data = pickle.loads(base64.b64decode(msg[0]))
+			reactor.connectTCP(data[0], data[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  data[2]))
 		else:
 			print msg
 	
 	def new_verify_hash(self, msg):
 		filename, nonce = msg
-		sha256hash = get_file_sha256_hash(self.factory.clientdir + '/tmp~/' + filename, nonce=nonce)
-		detail_string = base64.b64encode(pickle.dumps((filename, nonce, sha256hash)))
-		signature = self.factory.rsa_key.sign(hashlib.sha256(detail_string).hexdigest(), "")
+		try:
+			sha256hash = get_file_sha256_hash(self.factory.clientdir + '/tmp~/' + filename, nonce=nonce)
+			detail_string = base64.b64encode(pickle.dumps((filename, nonce, sha256hash)))
+			signature = self.factory.rsa_key.sign(hashlib.sha256(detail_string).hexdigest(), "")
+		except:
+			detail_string = "NA"
+			signature = self.factory.rsa_key.sign(hashlib.sha256(detail_string).hexdigest(), "")
 		self.transport.write(self.encode(("NEWVERIFYHASH", detail_string, signature)) + '\n')
 	
 	def parse_message(self, line):
@@ -340,6 +349,8 @@ if __name__ == '__main__':
 	rsa_key = wallet_info[1]
 	config = wallet_info[2]
 	clientdir = config.get('client', 'path')
+	if not os.path.exists(clientdir):
+		os.makedirs(clientdir)
 	enc_pwd = config.get('client', 'password')
 	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
 	med_ip = config.get('client', 'ip')
