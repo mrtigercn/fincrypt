@@ -337,13 +337,13 @@ if __name__ == '__main__':
 	walletcfg.readfp(open(configfile + '.wlt'))
 	wallet_info = load_client_wallet(configfile)
 	previous_file_dict = wallet_info[0]
+	rsa_key = wallet_info[1]
 	config = wallet_info[2]
 	clientdir = config.get('client', 'path')
 	enc_pwd = config.get('client', 'password')
 	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
 	med_ip = config.get('client', 'ip')
 	med_port = int(config.get('client', 'port'))
-	rsa_key = get_rsa_key(config)
 	key = hashlib.sha256(enc_pwd).digest()
 	gdc = get_dir_changes(clientdir)
 	if gdc == 'new':
