@@ -41,6 +41,8 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 			self.handle_RESOLVESTORAGENODE(msg)
 		elif cmd == 'VERIFY' and self.type == 'STORAGE':
 			self.handle_STORAGE_VERIFY(msg)
+		elif cmd == 'NEWCLIENTFILE':
+			self.handle_NEWCLIENTFILE(msg)
 		elif self.state == 'CONNECTED' and self.type == 'CLIENT':
 			self.handle_CLIENT(msg)
 		elif self.state == 'CONNECTED' and self.type == 'STORAGE':
@@ -121,6 +123,50 @@ class FincryptMediatorProtocol(basic.LineReceiver):
 				self.transport.write(self.factory.encode(('REG_CONFIRM',)) + "\n")
 		else:
 			self.transport.write(self.factory.encode(("ERROR", "Public Key not verified!\n")))
+	
+	def handle_NEWCLIENTFILE(self, msg):
+		# msg = [ detail_string, signature ]
+		detail_string, signature = msg
+		if not self.publickey.verify(hashlib.sha256(detail_string).hexdigest(), signature):
+			self.transport.write("Error! Public key not verified!\n")
+			return
+		data = pickle.loads(base64.b64decode(detail_string))
+		filename, filesize, sha256hash = data
+		if filename not in self.factory.files:
+			self.factory.files[filename] = {}
+			self.factory.files[filename]['snodes'] = {}
+			self.factory.files[filename]['snodes']['list'] = []
+			self.factory.files[filename]['client'] = self.name
+			snodes = self.factory.storage_nodes.items()
+			random.shuffle(snodes)
+			found = 0
+			y = 0
+			while found < 1 and y < len(self.factory.storage_nodes):
+				if self.factory.storage_nodes[snodes[y][0]].freespace >= filesize:
+					self.factory.files[filename]['snodes'][snodes[y][0]] = {}
+					self.factory.files[filename]['snodes'][snodes[y][0]]['status'] = 'UNVERIFIED'
+					self.factory.files[filename]['snodes'][snodes[y][0]]['last_checked'] = time.time()
+					self.factory.files[filename]['snodes'][snodes[y][0]]['history'] = (0,0)
+					self.factory.files[filename]['snodes']['list'].append(snodes[y][0])
+					found += 1
+				y += 1
+		elif filename in self.factory.files and self.factory.files[filename]['original_sha256'] == sha256hash:
+			self.transport.write(self.factory.encode(("PRINT", "File '%s' Up to Date" % filename)) + '\n')
+			return
+		self.factory.files[filename]['size'] = filesize
+		self.factory.files[filename]['current_nonce'] = ''
+		self.factory.files[filename]['original_sha256'] = sha256hash
+		self.factory.files[filename]['current_sha256'] = sha256hash
+		for snode in self.factory.files[filename]['snodes']:
+			if snode == 'list':
+				continue
+			self.factory.files[filename]['snodes'][snode]['status'] = 'UNVERIFIED'
+		first_snode = self.factory.files[filename]['snodes']['list'][0]
+		global rsa_key
+		self.factory.storage_nodes[first_snode].transport.write(self.factory.encode(("NEWFILE", filename, filesize, self.publickey, '%s' % rsa_key.publickey().exportKey())) + "\n")
+		init_ip = self.factory.storage_nodes[first_snode].ip
+		init_port = self.factory.storage_nodes[first_snode].port
+		self.transport.write(self.factory.encode(("STORAGE_DETAILS", base64.b64encode(pickle.dumps((init_ip, init_port, filename, self.factory.files[filename]['snodes']['list']))))) + '\n')
 	
 	def handle_CLIENT(self, msg):
 		detail_string, signature = msg
