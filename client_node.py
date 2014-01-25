@@ -141,7 +141,6 @@ def get_dir_changes(directory):
 
 def parse_dir_changes(directory, changes, pwd, key):
 	file_dict = {}
-	print changes
 	if not os.path.exists(directory + '/tmp~'):
 		os.makedirs(directory + '/tmp~')
 	for file in changes['created'] + changes['updated']:
@@ -188,7 +187,6 @@ def parse_existing_clientdir(pwd, directory):
 	d = Dir(directory)
 	for root, dirs, files in d.walk():
 		for fileName in files:
-			print root, fileName
 			if fileName[-1] == '~' or root[-1] == '~':
 				continue
 			else:
@@ -273,7 +271,6 @@ class MediatorClientProtocol(basic.LineReceiver):
 			for x in file_changes:
 				self.transport.write(base64.b64encode(pickle.dumps(("NEWCLIENTFILE", x))) + '\n')
 			for x in self.factory.get_files:
-				print x
 				self.transport.write(base64.b64encode(pickle.dumps(("RESOLVESTORAGENODE", x))) + '\n')
 		elif cmd == 'STORAGE_DETAILS':
 			data = pickle.loads(base64.b64decode(msg[0]))
