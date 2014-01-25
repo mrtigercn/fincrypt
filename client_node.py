@@ -47,7 +47,7 @@ class FileTransferProtocol(basic.LineReceiver):
 		
 		self.transport.write('\r\n')  
 		
-		os.unlink(file_path + '/' + filename) 
+		#os.unlink(file_path) 
 		
 		# When the transfer is finished, we go back to the line mode 
 		self.setLineMode()
@@ -151,7 +151,7 @@ def parse_dir_changes(directory, changes, pwd, key):
 			new_file = hashlib.sha256(pwd + directory + '/' + file).hexdigest()
 			encrypt_file(key, original_file, directory + '/tmp~/' + new_file)
 			file_dict[new_file] = original_file
-		return file_dict
+	return file_dict
 
 def parse_new_dir(directory, pwd, key):
 	file_dict = {}
@@ -167,7 +167,7 @@ def parse_new_dir(directory, pwd, key):
 				new_file = hashlib.sha256(pwd + root + '/' + file).hexdigest()
 				encrypt_file(key, original_file, directory + '/tmp~/' + new_file)
 				file_dict[new_file] = original_file
-			return file_dict
+	return file_dict
 
 def parse_tmp_dir(directory):
 	directory = directory + '/tmp~'
@@ -214,9 +214,9 @@ def load_client_wallet(configfile):
 	try:
 		configcontent = pickle.loads(base64.b64decode(walletcfg.get('settings', 'config')))
 	except:
-		configcontent = 'new'
+		configcontent = ConfigParser.ConfigParser()
 	
-	return files, rsacontent, config
+	return files, rsacontent, configcontent
 
 def save_client_wallet(configfile, config, rsa_key, file_dict):
 	walletfile = configfile + '.wlt'
@@ -314,14 +314,17 @@ class MediatorClientFactory(protocol.ClientFactory):
 		self.enc_pwd = enc_pwd
 		self.redundancy = redundancy
 
-def process_file_list(gdc, existing_file_dict, new_file_dict):
+def process_file_list(previous_file_dict, current_file_dict):
 	get_list = []
 	
-	for x in existing_file_dict:
-		if x not in new_file_dict:
+	if previous_file_dict == 'new':
+		return new_file_dict, []
+	
+	for x in previous_file_dict:
+		if x not in current_file_dict:
 			get_list.append(x)
 	
-	file_dict = dict(existing_file_dict.items() + new_file_dict.items())
+	file_dict = dict(previous_file_dict.items() + current_file_dict.items())
 	return file_dict, get_list
 
 if __name__ == '__main__':
@@ -330,11 +333,11 @@ if __name__ == '__main__':
 		configfile = sys.argv[1]
 	except IndexError:
 		configfile = 'client'
-	config = ConfigParser.ConfigParser()
 	walletcfg = ConfigParser.ConfigParser()
-	config.readfp(open(configfile + '.cfg'))
 	walletcfg.readfp(open(configfile + '.wlt'))
-	previous_file_dict = load_client_wallet(configfile)[0]
+	wallet_info = load_client_wallet(configfile)
+	previous_file_dict = wallet_info[0]
+	config = wallet_info[2]
 	clientdir = config.get('client', 'path')
 	enc_pwd = config.get('client', 'password')
 	existing_file_dict = parse_existing_clientdir(enc_pwd, clientdir)
@@ -347,8 +350,8 @@ if __name__ == '__main__':
 		new_file_dict = parse_new_dir(clientdir, enc_pwd, key)
 	else:
 		new_file_dict = parse_dir_changes(clientdir, gdc, enc_pwd, key)
-	file_dict = dict(previous_file_dict.items() + new_file_dict.items())
-	file_dict, get_list = process_file_list(gdc, existing_file_dict, file_dict)
+	file_dict = dict(existing_file_dict.items() + new_file_dict.items())
+	file_dict, get_list = process_file_list(previous_file_dict, existing_file_dict)
 	save_client_wallet(configfile, config, rsa_key, file_dict)
 	tmp_files = parse_tmp_dir(clientdir)
 	defer.setDebugging(True)
