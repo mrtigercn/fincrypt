@@ -121,7 +121,7 @@ class FileTransferProtocol(basic.LineReceiver):
 			else:
 				os.unlink(file_path)
 				print 'File %s has been successfully transfered, but deleted due to invalid MD5 hash' % (filename)
-			self.loseConnection()
+			self.transport.loseConnection()
 		else:
 			self.file_handler.write(data)
 
