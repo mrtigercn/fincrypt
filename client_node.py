@@ -1,6 +1,6 @@
 import os, ConfigParser, sys
 
-from twisted.internet import reactor, protocol, stdio, defer
+from twisted.internet import reactor, protocol, stdio, defer, task
 from twisted.protocols import basic
 from twisted.internet.protocol import ClientFactory
 
@@ -48,6 +48,8 @@ class FileTransferProtocol(basic.LineReceiver):
 		
 		self.transport.write('\r\n')  
 		
+		self.transport.loseConnection()
+		
 		#os.unlink(file_path) 
 		
 		# When the transfer is finished, we go back to the line mode 
@@ -68,9 +70,10 @@ class FileTransferProtocol(basic.LineReceiver):
 		self.file_handler = None
 		self.file_data = ()
 		
+		if self.factory.client:
+			self.factory.client.dec_connection_count()
+		
 		print 'Connection to the server has been lost'
-		#if reactor.running:
-		#	reactor.stop()
 	
 	def lineReceived(self, line):
 		if line == 'ENDMSG':
@@ -118,13 +121,14 @@ class FileTransferProtocol(basic.LineReceiver):
 			else:
 				os.unlink(file_path)
 				print 'File %s has been successfully transfered, but deleted due to invalid MD5 hash' % (filename)
+			self.loseConnection()
 		else:
 			self.file_handler.write(data)
 
 class FileTransferClientFactory(protocol.ClientFactory):
 	protocol = FileTransferProtocol
 	
-	def __init__(self, cmd, files_path, filename, client=None, rsa_key=None, max_connections=8):
+	def __init__(self, cmd, files_path, filename, client=None, rsa_key=None):
 		self.cmd = cmd
 		self.rsa_key = rsa_key
 		self.client = client
@@ -283,12 +287,12 @@ class MediatorClientProtocol(basic.LineReceiver):
 				self.transport.write(base64.b64encode(pickle.dumps(("RESOLVESTORAGENODE", x))) + '\n')
 		elif cmd == 'STORAGE_DETAILS':
 			data = pickle.loads(base64.b64decode(msg[0]))
-			reactor.connectTCP(data[0], data[1], FileTransferClientFactory('send', self.factory.clientdir + '/tmp~', data[2], rsa_key=self.factory.rsa_key))
+			self.factory.queue.append(('send', data[0], data[1], data[2]))
 		elif cmd == 'NEWVERIFYHASH':
 			self.new_verify_hash(msg)
 		elif cmd == 'NODEDETAILS':
 			if msg[0] != 'NOT FOUND':
-				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2], client=self.factory.client))
+				self.queue.append(('get', msg[0], msg[1], msg[2]))
 		else:
 			print msg
 	
@@ -338,6 +342,32 @@ class MediatorClientFactory(protocol.ClientFactory):
 		self.get_files = get_files
 		self.enc_pwd = enc_pwd
 		self.redundancy = redundancy
+		self.queue = []
+		self.l = task.LoopingCall(self.process_queue)
+		self.l.start(5.0)
+	
+	def send_file(self, ip, port, filename):
+		reactor.connectTCP(ip, port, FileTransferClientFactory('send', self.clientdir + '/tmp~', filename, rsa_key=self.rsa_key, client=self.client))
+	
+	def get_file(self, ip, port, filename):
+		reactor.connectTCP(ip, port, FileTransferClientFactory('get', self.clientdir + '/restore~',  filename, client=self.client))
+	
+	def process_queue(self):
+		if len(self.queue) == 0:
+			return
+		curconn = self.client.get_connection_count()
+		maxconn = self.client.get_max_connections()
+		if curconn >= maxconn:
+			return
+		cmd = self.queue[0]
+		del(self.queue[0])
+		if cmd[0] == 'send':
+			self.send_file(cmd[1], cmd[2], cmd[3])
+		elif cmd[0] == 'get':
+			self.get_file(cmd[1], cmd[2], cmd[3])
+		self.client.inc_connection_count()
+		if curconn < (maxconn - 1):
+			self.process_queue()
 
 def process_file_list(previous_file_dict, current_file_dict):
 	get_list = []
@@ -354,7 +384,7 @@ def process_file_list(previous_file_dict, current_file_dict):
 
 
 class ClientNode():
-	def __init__(self, configfile, debug=False, max_connections=8):
+	def __init__(self, configfile, debug=False, max_connections=4):
 		self.connection_count = 0
 		self.max_connections = max_connections
 		self.debug = debug
@@ -412,15 +442,15 @@ class ClientNode():
 		reactor.run()
 	
 	def get_connection_count(self):
-		return self.connections
+		return self.connection_count
 	
 	def inc_connection_count(self):
-		self.connections += 1
-		return self.connections
+		self.connection_count += 1
+		return self.connection_count
 	
 	def dec_connection_count(self):
-		self.connections -= 1
-		return self.connections
+		self.connection_count -= 1
+		return self.connection_count
 	
 	def get_max_connections(self):
 		return self.max_connections
