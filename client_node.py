@@ -396,22 +396,19 @@ class ClientNode():
 		try:
 			self.clientdir = self.config.get('client', 'path')
 		except:
-			self.clientdir = sys.argv[2]
+			if len(sys.argv) >= 3:
+				self.clientdir = sys.argv[2]
+			else:
+				self.clientdir = None
 		
-		if not os.path.exists(self.clientdir):
-			os.makedirs(self.clientdir)
-			
 		try:
 			self.enc_pwd = self.config.get('client', 'password')
 		except:
-			self.enc_pwd = sys.argv[3]
+			if len(sys.argv) >= 4:
+				self.enc_pwd = sys.argv[3]
+			else:
+				self.enc_pwd = None
 		
-		self.key = hashlib.sha256(self.enc_pwd).digest()
-		
-		if os.path.exists(self.clientdir + '/restore~'):
-			self.process_restore_folder()
-		
-		self.existing_file_dict = parse_existing_clientdir(self.enc_pwd, self.clientdir)
 		
 		try:
 			self.med_ip = self.config.get('client', 'ip')
@@ -419,6 +416,28 @@ class ClientNode():
 		except:
 			self.med_ip = '162.243.36.143'
 			self.med_port = 8001
+		
+	def set_clientdir(self, clientdir):
+		self.clientdir = clientdir
+		self.config.set('client', 'path', clientdir)
+	
+	def set_password(self, password):
+		self.enc_pwd = password
+		self.config.set('client', 'password', password)
+	
+	def connect(self):
+		if self.clientdir == None:
+			raise MissingAttributeError('Missing Directory')
+		if self.enc_pwd == None:
+			raise MissingAttributeError('Missing Password')
+		
+		if os.path.exists(self.clientdir + '/restore~'):
+			self.process_restore_folder()
+		if not os.path.exists(self.clientdir):
+			os.makedirs(self.clientdir)
+			
+		self.key = hashlib.sha256(self.enc_pwd).digest()
+		self.existing_file_dict = parse_existing_clientdir(self.enc_pwd, self.clientdir)
 		
 		self.gdc = get_dir_changes(self.clientdir, self.configfile)
 		if self.gdc == 'new':
@@ -435,12 +454,7 @@ class ClientNode():
 		self.config.set('client', 'port', self.med_port)
 		
 		save_client_wallet(self.configfile, self.config, self.rsa_key, self.file_dict)
-	
-	def set_clientdir(self, clientdir):
-		self.clientdir = clientdir
-		self.config.set('client', 'path', clientdir)
-	
-	def connect(self):
+		
 		defer.setDebugging(self.debug)
 		reactor.connectTCP(self.med_ip, self.med_port, MediatorClientFactory(self.clientdir, self.rsa_key, self.tmp_files, 2, self.get_list, self.enc_pwd, self))
 		reactor.run()
@@ -470,6 +484,12 @@ class ClientNode():
 						os.makedirs(os.path.dirname(self.clientdir + '/' + self.file_dict[file]))
 					decrypt_file(self.key, root + '/' + file, self.clientdir + '/' + self.file_dict[file])
 					os.unlink(root + '/' + file)
+
+class MissingAttributeError(Exception):
+	def __init__(self, value):
+		self.value = value
+	def __str__(self):
+		return repr(self.value)
 
 if __name__ == '__main__':
 	# What follows is a bunch of hardcoded stuff for use while building the system.
