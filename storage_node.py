@@ -42,6 +42,7 @@ class FileTransferProtocol(basic.LineReceiver):
 			return 
 		
 		command = data[0].lower()
+		print command
 		if not command in COMMANDS:
 			self.transport.write('Invalid command\n')
 			self.transport.write('ENDMSG\n')
