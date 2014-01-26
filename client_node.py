@@ -292,7 +292,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 			self.new_verify_hash(msg)
 		elif cmd == 'NODEDETAILS':
 			if msg[0] != 'NOT FOUND':
-				self.queue.append(('get', msg[0], msg[1], msg[2]))
+				self.factory.queue.append(('get', msg[0], msg[1], msg[2]))
 		else:
 			print msg
 	
