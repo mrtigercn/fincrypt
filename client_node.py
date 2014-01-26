@@ -124,7 +124,7 @@ class FileTransferProtocol(basic.LineReceiver):
 class FileTransferClientFactory(protocol.ClientFactory):
 	protocol = FileTransferProtocol
 	
-	def __init__(self, cmd, files_path, filename, client=None, rsa_key=None):
+	def __init__(self, cmd, files_path, filename, client=None, rsa_key=None, max_connections=8):
 		self.cmd = cmd
 		self.rsa_key = rsa_key
 		self.client = client
@@ -354,7 +354,9 @@ def process_file_list(previous_file_dict, current_file_dict):
 
 
 class ClientNode():
-	def __init__(self, configfile, debug=False):
+	def __init__(self, configfile, debug=False, max_connections=8):
+		self.connection_count = 0
+		self.max_connections = max_connections
 		self.debug = debug
 		self.configfile = configfile
 		self.wallet_info = load_client_wallet(self.configfile)
@@ -409,6 +411,20 @@ class ClientNode():
 		reactor.connectTCP(self.med_ip, self.med_port, MediatorClientFactory(self.clientdir, self.rsa_key, self.tmp_files, 2, self.get_list, self.enc_pwd, self))
 		reactor.run()
 	
+	def get_connection_count(self):
+		return self.connections
+	
+	def inc_connection_count(self):
+		self.connections += 1
+		return self.connections
+	
+	def dec_connection_count(self):
+		self.connections -= 1
+		return self.connections
+	
+	def get_max_connections(self):
+		return self.max_connections
+	
 	def process_restore_folder(self):
 		restoredir = self.clientdir + '/restore~'
 		d = Dir(restoredir)
@@ -416,9 +432,9 @@ class ClientNode():
 		for root, dirs, files in d.walk():
 			for file in files:
 				if file in self.file_dict:
-					if not os.path.exists(os.path.dirname(self.file_dict[file])):
-						os.makedirs(os.path.dirname(self.file_dict[file]))
-					decrypt_file(self.key, root + '/' + file, self.file_dict[file])
+					if not os.path.exists(os.path.dirname(self.clientdir + '/' + self.file_dict[file])):
+						os.makedirs(os.path.dirname(self.clientdir + '/' + self.file_dict[file]))
+					decrypt_file(self.key, root + '/' + file, self.clientdir + '/' + self.file_dict[file])
 					os.unlink(root + '/' + file)
 
 if __name__ == '__main__':
