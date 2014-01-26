@@ -138,7 +138,7 @@ def get_dir_changes(directory):
 	try:
 		d2 = Dir('./')
 		dir_state_old = DirState.from_json(directory + '.json')
-		dir_state_new.to_json()
+		dir_state_new.to_json(fmt=directory + '.json')
 		return dir_state_new - dir_state_old
 	except:
 		dir_state_new.to_json(fmt=directory + '.json')
@@ -207,7 +207,9 @@ def load_client_wallet(configfile):
 	try:
 		walletcfg.readfp(open(walletfile))
 	except IOError:
-		return 'new', RSA.generate(4096), ConfigParser.ConfigParser()
+		configcontent = ConfigParser.ConfigParser()
+		configcontent.add_section('client')
+		return 'new', RSA.generate(4096), configcontent
 	
 	try:
 		files = pickle.loads(base64.b64decode(walletcfg.get('settings', 'files')))
@@ -223,6 +225,7 @@ def load_client_wallet(configfile):
 		configcontent = pickle.loads(base64.b64decode(walletcfg.get('settings', 'config')))
 	except:
 		configcontent = ConfigParser.ConfigParser()
+		configcontent.add_section('client')
 	
 	return files, rsacontent, configcontent
 
@@ -391,7 +394,6 @@ class ClientNode():
 			self.new_file_dict = parse_dir_changes(self.clientdir, self.gdc, self.enc_pwd, self.key)
 		self.file_dict = dict(self.existing_file_dict.items() + self.new_file_dict.items())
 		self.file_dict, self.get_list = process_file_list(self.previous_file_dict, self.existing_file_dict)
-		save_client_wallet(self.configfile, self.config, self.rsa_key, self.file_dict)
 		self.tmp_files = parse_tmp_dir(self.clientdir)
 		
 		self.config.set('client', 'path', self.clientdir)
@@ -399,7 +401,7 @@ class ClientNode():
 		self.config.set('client', 'ip', self.med_ip)
 		self.config.set('client', 'port', self.med_port)
 		
-		self.config.write(open(configfile + '.cfg', 'wb'))
+		save_client_wallet(self.configfile, self.config, self.rsa_key, self.file_dict)
 	
 	def connect(self):
 		defer.setDebugging(self.debug)
