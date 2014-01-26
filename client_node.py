@@ -436,6 +436,10 @@ class ClientNode():
 		
 		save_client_wallet(self.configfile, self.config, self.rsa_key, self.file_dict)
 	
+	def set_clientdir(self, clientdir):
+		self.clientdir = clientdir
+		self.config.set('client', 'path', clientdir)
+	
 	def connect(self):
 		defer.setDebugging(self.debug)
 		reactor.connectTCP(self.med_ip, self.med_port, MediatorClientFactory(self.clientdir, self.rsa_key, self.tmp_files, 2, self.get_list, self.enc_pwd, self))

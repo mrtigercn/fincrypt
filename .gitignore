@@ -5,6 +5,7 @@ __pycache__/
 clientdir/
 clientdir2/
 clientdir*.json
+client.json
 storagedir/
 storagedir*.json
 venv/
