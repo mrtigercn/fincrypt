@@ -132,16 +132,16 @@ class FileTransferClientFactory(protocol.ClientFactory):
 		self.filename = filename
 		self.deferred = defer.Deferred()
 
-def get_dir_changes(directory):
+def get_dir_changes(directory, configfile):
 	d = Dir(directory)
 	dir_state_new = DirState(d)
 	try:
 		d2 = Dir('./')
-		dir_state_old = DirState.from_json(directory + '.json')
-		dir_state_new.to_json(fmt=directory + '.json')
+		dir_state_old = DirState.from_json(configfile + '.json')
+		dir_state_new.to_json(fmt=configfile + '.json')
 		return dir_state_new - dir_state_old
 	except:
-		dir_state_new.to_json(fmt=directory + '.json')
+		dir_state_new.to_json(fmt=configfile + '.json')
 		return 'new'
 
 def parse_dir_changes(directory, changes, pwd, key):
@@ -271,6 +271,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 	def lineReceived(self, line):
 		msg = self.parse_message(line)
 		cmd, msg = msg[0], msg[1:]
+		print cmd
 		if cmd == 'REGISTER':
 			register_details = self.mediator_details()
 			self.transport.write(register_details + '\n')
@@ -286,7 +287,6 @@ class MediatorClientProtocol(basic.LineReceiver):
 		elif cmd == 'NEWVERIFYHASH':
 			self.new_verify_hash(msg)
 		elif cmd == 'NODEDETAILS':
-			print msg
 			if msg[0] != 'NOT FOUND':
 				reactor.connectTCP(msg[0], msg[1], FileTransferClientFactory('get', self.factory.clientdir + '/restore~',  msg[2], client=self.factory.client))
 		else:
@@ -314,6 +314,7 @@ class MediatorClientProtocol(basic.LineReceiver):
 	def file_changes(self):
 		change_list = []
 		for x in self.factory.files:
+			print x
 			detail_string = base64.b64encode(pickle.dumps((x[1], x[2], x[3])))
 			signature = self.factory.rsa_key.sign(hashlib.sha256(detail_string).hexdigest(), "")
 			change_list.append((detail_string, signature))
@@ -387,7 +388,7 @@ class ClientNode():
 			self.med_ip = '162.243.36.143'
 			self.med_port = 8001
 		
-		self.gdc = get_dir_changes(self.clientdir)
+		self.gdc = get_dir_changes(self.clientdir, self.configfile)
 		if self.gdc == 'new':
 			self.new_file_dict = parse_new_dir(self.clientdir, self.enc_pwd, self.key)
 		else:
